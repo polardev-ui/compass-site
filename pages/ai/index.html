@@ -1,0 +1,156 @@
+<html lang="en"> <!-- If you can read this, and can understand this
+    code, you should come work with us: nzezmw@gmail.com Email us. -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ai | compassplate</title>
+    <link rel="icon" type="image/gif" href="/compass.gif">
+    <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      background-color: black;
+      color: white;
+      overflow: hidden;
+    }
+
+    .response {
+         margin-top: 20px;
+         font-size: 1.2em;
+         background-color: #666;
+         border-radius: 5px;
+         padding: 10px;
+    }
+
+    .chat-container {
+        margin-top: 20px;
+        width: 80vw;
+        max-width: 400px;
+        background-color: #333;
+        border-radius: 5px;
+        padding: 10px;
+    }
+
+    .line {
+        width: 100%;
+        height: 3px;
+        position: absolute;
+        bottom: -8px;
+        background: #bdc3c7;
+    }
+
+    .input {
+        background: 0;
+        border: 0;
+        outline: none;
+        width: 100%; 
+        font-size: 1.5em;
+        transition: padding 0.3s 0.2s ease;
+        color: white;
+    }
+
+    .anchor-logo {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        height: 50px;
+        width: 50px;
+    }
+
+    button {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: none;
+        border: 2px solid white;
+        color: white;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 1em;
+        border-radius: 5px;
+    }
+    </style>
+</head>
+<body>
+    <button class="back">back</button>
+    <img src="/compass.gif" alt="logo" class="anchor-logo">
+    <h1> ai chatbot </h1>
+    <p> credits to @lmaopolar for the insanely fast api </p>
+    <div class="line"></div>
+    <div class="chat-container" id="">
+        <div class="bottom">
+            <input type="text" placeholder="Type your message and hit Enter..." class="input">
+            <div class="response"></div>
+        </div>
+    </div>
+    <script>
+    const input = document.querySelector('input');
+    const API = 'api_masbdvh';
+    
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            const userMessage = input.value;
+            input.value = '';
+            
+            fetch('https://api.wsgpolar.me/v1/ai/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API}`
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.1-8b-instant',
+                    messages: [
+                        { role: 'system', content: 'You are a concise AI assistant made by a developer named Polar. Keep responses concise. Your name is Zeta.' },
+                        { role: 'user', content: userMessage }
+                    ]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.choices && data.choices[0] && data.choices[0].message) {
+                    document.querySelector('.response').textContent = data.choices[0].message.content;
+                } else {
+                    document.querySelector('.response').textContent = 'Error: Invalid response format';
+                    console.log('Response:', data);
+                }
+            })
+            .catch(error => {
+                document.querySelector('.response').textContent = 'Error: ' + error.message;
+            });
+        }
+    });
+
+    const chatContainer = document.getElementById('');
+    
+    // too lazy to implement
+    function appendMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}`;
+        messageDiv.textContent = text;
+        messageDiv.style.marginBottom = '10px';
+        messageDiv.style.padding = '8px';
+        messageDiv.style.borderRadius = '5px';
+        messageDiv.style.backgroundColor = sender === 'user' ? '#0078d4' : '#555';
+        messageDiv.style.alignSelf = sender === 'user' ? 'flex-end' : 'flex-start';
+        messageDiv.style.maxWidth = '80%';
+        messageDiv.style.wordWrap = 'break-word';
+        chatContainer.style.display = 'flex';
+        chatContainer.style.flexDirection = 'column';
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+    </script>
+    <script>
+    const backButton = document.querySelector('.back');
+    backButton.addEventListener('click', () => {
+        window.location.href = '/index.html';
+    });
+    </script>
+</body>
+</html>
