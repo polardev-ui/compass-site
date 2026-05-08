@@ -1,0 +1,276 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Checks | compassplate</title>
+    <link rel="icon" type="image/gif" href="/compass.gif">
+    <style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #000;
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .navbar {
+        background: #000;
+        border-bottom: 1px solid #333;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .navbar-brand {
+        font-size: 20px;
+        font-weight: 600;
+        color: #fff;
+    }
+
+    .back-link {
+        color: #fff;
+        text-decoration: none;
+        font-size: 14px;
+        padding: 8px 12px;
+        border: 1px solid #fff;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .back-link:hover {
+        background-color: #fff;
+        color: #000;
+    }
+
+    .container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+    }
+
+    .logo {
+        width: 100px;
+        height: 100px;
+        margin-bottom: 30px;
+    }
+
+    .title {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-align: center;
+        color: #fff;
+    }
+
+    .subtitle {
+        font-size: 14px;
+        color: #999;
+        margin-bottom: 40px;
+        text-align: center;
+    }
+
+    .checks-box {
+        background: #111;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 30px;
+        max-width: 400px;
+        width: 100%;
+    }
+
+    .check-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #000;
+        border-radius: 6px;
+        border-left: 3px solid #333;
+    }
+
+    .check-item.pending {
+        border-left-color: #ff6b00;
+    }
+
+    .check-item.success {
+        border-left-color: #fff;
+    }
+
+    .check-item.error {
+        border-left-color: #ff0000;
+    }
+
+    .check-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        flex-shrink: 0;
+        font-size: 16px;
+    }
+
+    .check-icon.pending::before {
+        content: '●';
+        animation: pulse 1s ease-in-out infinite;
+        color: #ff6b00;
+    }
+
+    .check-icon.success::before {
+        content: '✓';
+        color: #fff;
+    }
+
+    .check-icon.error::before {
+        content: '✗';
+        color: #ff0000;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .check-text {
+        flex: 1;
+    }
+
+    .check-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #fff;
+    }
+
+    .check-message {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+
+    @media (max-width: 768px) {
+        .checks-box {
+            max-width: 100%;
+        }
+
+        .title {
+            font-size: 24px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+        }
+    }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-brand">compassplate | checking</div>
+        <a href="/index.html" class="back-link">← back</a>
+    </div>
+
+    <div class="container">
+        <img src="/compass.gif" alt="Loading" class="logo">
+        <h1 class="title">Initializing Proxy</h1>
+        <p class="subtitle">Running system checks...</p>
+        <div class="checks-box" id="checksContainer"></div>
+    </div>
+
+    <script>
+    const checksContainer = document.getElementById('checksContainer');
+
+    function addCheck(id, label, state, message) {
+        let item = document.getElementById(`check-${id}`);
+        if (!item) {
+            item = document.createElement('div');
+            item.id = `check-${id}`;
+            item.className = `check-item ${state}`;
+            checksContainer.appendChild(item);
+        }
+        item.className = `check-item ${state}`;
+        item.innerHTML = `
+            <div class="check-icon ${state}"></div>
+            <div class="check-text">
+                <div class="check-label">${label}</div>
+                ${message ? `<div class="check-message">${message}</div>` : ''}
+            </div>
+        `;
+    }
+
+    async function runChecks() {
+        addCheck('1', 'Checking Scramjet', 'pending', 'Verifying installation...');
+        await new Promise(r => setTimeout(r, 1000));
+
+        try {
+            const response = await fetch('/api/scramjet-status');
+            if (response.ok) {
+                addCheck('1', 'Scramjet Ready', 'success', 'v4.36.2');
+            } else {
+                throw new Error('Not available');
+            }
+        } catch {
+            addCheck('1', 'Scramjet Ready', 'error', 'Not found');
+            await new Promise(r => setTimeout(r, 500));
+            return;
+        }
+
+        addCheck('2', 'Testing Functionality', 'pending', 'Running diagnostics...');
+        await new Promise(r => setTimeout(r, 1000));
+
+        try {
+            const response = await fetch('/api/scramjet-test');
+            if (response.ok) {
+                addCheck('2', 'Proxy Active', 'success', 'Operational');
+            } else {
+                throw new Error('Not functional');
+            }
+        } catch {
+            addCheck('2', 'Proxy Active', 'error', 'Not responding');
+            await new Promise(r => setTimeout(r, 500));
+            return;
+        }
+
+        addCheck('3', 'Verifying User', 'pending', 'Checking credentials...');
+        await new Promise(r => setTimeout(r, 800));
+
+        const headers = new Headers();
+        headers.append('User-Agent', navigator.userAgent);
+        headers.append('Accept-Language', navigator.language);
+
+        try {
+            const response = await fetch('/api/verify-user', { headers });
+            if (response.ok) {
+                addCheck('3', 'User Verified', 'success', 'Real user detected');
+            } else {
+                throw new Error('Verification failed');
+            }
+        } catch {
+            addCheck('3', 'User Verified', 'error', 'Could not verify');
+            await new Promise(r => setTimeout(r, 500));
+            return;
+        }
+
+        await new Promise(r => setTimeout(r, 800));
+        addCheck('4', 'Proxy Ready', 'success', 'All systems go');
+        
+        await new Promise(r => setTimeout(r, 1000));
+        window.location.href = '/pages/proxy/';
+    }
+
+    runChecks();
+    </script>
+</body>
+</html>
