@@ -1,0 +1,78 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>credits | compassplate</title>
+    <link rel="icon" type="image/gif" href="/compass.gif">
+    <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      background-color: black;
+      color: white;
+      overflow: hidden;
+    }
+
+    .anchor-logo {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        height: 50px;
+        width: 50px;
+    }
+
+    button {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: none;
+        border: 2px solid white;
+        color: white;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 1em;
+        border-radius: 5px;
+    }
+    </style>
+</head>
+<body>
+    <button class="back">back</button>
+    <img src="/compass.gif" alt="logo" class="anchor-logo">
+    <h1> credits </h1>
+    <div class="w3schools" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/w3schools.png" alt="w3schools logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;">W3Schools for the <a href="https://www.w3schools.com/howto/howto_js_collapse_sidebar.asp" style="color: white; text-decoration: underline;">Sidebar Tutorial</a></p>
+    </div>
+    <div class="codepen" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/codepen.png" alt="codepen logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;"> CodePen for the Search Bar Input Styling </p>
+    </div>
+    <div class="compassplate" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/compass.gif" alt="compassplate logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;"> Compassplate for the GIF/Logo </p>
+    </div>
+    <div class="google-gemini" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/google-gemini.png" alt="google-gemini logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;"> Google Gemini for fixing the sidebar positioning </p>
+    </div>
+    <div class="vidfast" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/vidfast.png" alt="vidfast logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;"> VidFast for the movies and TV shows functionality </p>
+    </div>
+    <div class="tmdb" style="display: flex; align-items: center; margin: 10px 0;">
+        <img src="/tmdb.png" alt="tmdb logo" style="width: 50px; height: 50px; margin-right: 10px; flex-shrink: 0;">
+        <p style="margin: 0;"> The Movie Database for the movies and TV shows data </p>
+    </div>
+    <script>
+    const backButton = document.querySelector('.back');
+    backButton.addEventListener('click', () => {
+        window.location.href = '/index.html';
+    });
+    </script>
+</body>
+</html>
