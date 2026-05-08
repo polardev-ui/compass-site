@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>compassplate</title>
+  <link rel="icon" type="image/gif" href="compass.gif">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      background-color: black;
+      color: white;
+      overflow: hidden;
+    }
+
+    img {
+      width: 170px;
+      height: 170px;
+    }
+
+    h1 {
+      margin-top: 20px;
+    }
+
+    input {
+      background: 0;
+      border: 0;
+      outline: none;
+      width: 100%; 
+      font-size: 1.5em;
+      transition: padding 0.3s 0.2s ease;
+      color: white;
+    }
+
+    input:focus {
+      padding-bottom: 5px;
+    }
+
+    input:focus + .line:after {
+      transform: scaleX(1);
+    }
+
+    .field {
+      position: relative;
+      width: 80vw;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .field .line {
+      width: 100%;
+      height: 3px;
+      position: absolute;
+      bottom: -8px;
+      background: #bdc3c7;
+    }
+
+    .field .line:after {
+        content: " ";
+        position: absolute;
+        width: 100%;
+        height: 3px;
+        left: 0;
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 0.3s ease;
+        background: red;
+        z-index: 1;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      z-index: 10;
+      top: 0;
+      left: 0;
+      background-color: #111;
+      overflow-x: hidden;
+      padding-top: 60px;
+      transition: 0.5s;
+    }
+
+    .sidebar a {
+      padding: 8px 8px 8px 32px;
+      text-decoration: none;
+      font-size: 25px;
+      color: #818181;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      color: #f1f1f1;
+    }
+
+    .sidebar .closebtn {
+      position: absolute;
+      top: 10px;
+      right: 25px;
+      font-size: 36px;
+    }
+
+    .openbtn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 24px;
+      cursor: pointer;
+      background: none;
+      color: white;
+      border: none;
+      padding: 10px;
+      z-index: 5;
+    }
+
+    .openbtn:hover {
+      color: #444;
+    }
+
+    #main {
+      transition: margin-left .5s;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    @media screen and (max-height: 450px) {
+      .sidebar { padding-top: 15px; }
+      .sidebar a { font-size: 18px; }
+    }
+
+    .sidebar-logo {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 20px;
+        margin-left: 27px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="mySidebar" class="sidebar">
+    <img src="compass.gif" alt="logo" class="sidebar-logo">
+
+    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+    <a href="pages/about">About</a>
+    <a href="pages/credits">Credits</a>
+    <a href="pages/socials">Socials</a>
+    <a href="pages/ai">AI Chat</a>
+  </div>
+
+  <button class="openbtn" onclick="openNav()">&#9776;</button>
+
+  <div id="main">
+    <img src="compass.gif" alt="compass">
+    <h1>compassplate</h1>
+    <div class="field">
+      <input class="search" type="text" placeholder="search...">
+      <div class="line"></div>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.querySelector('.search');
+    
+    searchInput.addEventListener('keypress', function(event) {
+      if (event.key === 'Enter') {
+        const query = searchInput.value.trim();
+        if (query) {
+          window.location.href = `/pages/movies/?q=${encodeURIComponent(query)}`;
+        }
+      }
+    });
+
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "250px";
+    }
+
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+    }
+  </script>
+</body>
+</html>
