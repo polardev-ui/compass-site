@@ -1,0 +1,63 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>about | compassplate</title>
+    <link rel="icon" type="image/gif" href="/beta/compass-beta.gif">
+    <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      background-color: black;
+      color: white;
+      overflow: hidden;
+    }
+
+    .anchor-logo {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        height: 50px;
+        width: 50px;
+    }
+
+    button {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: none;
+        border: 2px solid white;
+        color: white;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 1em;
+        border-radius: 5px;
+    }
+    </style>
+</head>
+<body>
+    <button class="back">back</button>
+    <img src="/beta/compass-beta.gif" alt="logo" class="anchor-logo">
+    <h1> about </h1>
+    <p>hey, my name is compassplate. here's a bit about me:</p>
+    <ul>
+        <li>professional software engineer with 10 years of experience</li>
+        <li>15 years old (yes i started when i was 5)</li>
+        <li>know python, html, css, js, C#, react, and more</li>
+        <li>currently learning rust and golang</li>
+        <li>have worked on various projects including web development, game development, and automation</li>
+        <li>passionate about coding and always eager to learn new technologies</li>
+    </ul>
+    <script>
+    const backButton = document.querySelector('.back');
+    backButton.addEventListener('click', () => {
+        window.location.href = '/index.html';
+    });
+    </script>
+</body>
+</html>
