@@ -151,10 +151,10 @@
     <img src="beta/compass-beta.gif" alt="logo" class="sidebar-logo">
 
     <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-    <a href="pages/about">About</a>
-    <a href="pages/credits">Credits</a>
-    <a href="pages/socials">Socials</a>
-    <a href="pages/ai">AI Chat</a>
+    <a href="/beta/pages/about">About</a>
+    <a href="/beta/pages/credits">Credits</a>
+    <a href="/beta/pages/socials">Socials</a>
+    <a href="/beta/pages/ai">AI Chat</a>
   </div>
 
   <button class="openbtn" onclick="openNav()">&#9776;</button>
@@ -175,7 +175,7 @@
       if (event.key === 'Enter') {
         const query = searchInput.value.trim();
         if (query) {
-          window.location.href = `/pages/movies/?q=${encodeURIComponent(query)}`;
+          window.location.href = `/beta/pages/movies/?q=${encodeURIComponent(query)}`;
         }
       }
     });
