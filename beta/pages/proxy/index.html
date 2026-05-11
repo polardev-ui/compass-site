@@ -129,12 +129,13 @@
         function navigate() {
             let target = input.value.trim();
             if (!target) return;
-
+        
             if (!target.startsWith('http')) {
                 target = 'https://' + target;
             }
-
-            const proxyPath = `/proxy/${target}`;
+        
+            const proxyPath = `https://proxy.wsgpolar.tech/proxy/${target}`;
+            
             frame.src = proxyPath;
             display.textContent = target;
         }
