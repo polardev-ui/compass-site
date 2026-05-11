@@ -1226,7 +1226,7 @@
     };
 
     window.playMovie = function(movieId) {
-        const vidFastUrl = `https://vidfast.pro/movie/${movieId}?autoPlay=true`;
+        const vidFastUrl = `https://vidfast.me/movie/${movieId}?autoPlay=true`;
         videoFrame.src = vidFastUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
@@ -1237,7 +1237,7 @@
     };
 
     window.playTvShow = function(tvShowId, seasonNumber, episodeNumber) {
-        const vidFastUrl = `https://vidfast.pro/tv/${tvShowId}/${seasonNumber}/${episodeNumber}?autoPlay=true`;
+        const vidFastUrl = `https://vidfast.me/tv/${tvShowId}/${seasonNumber}/${episodeNumber}?autoPlay=true`;
         videoFrame.src = vidFastUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
