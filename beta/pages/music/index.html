@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -689,7 +688,7 @@ async function startAuth() {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
-    redirect_uri: location.href.split('?')[0].split('#')[0],
+    redirect_uri: 'https://play.wsgpolar.tech/beta/pages/music',
     code_challenge_method: 'S256',
     code_challenge: challenge,
     scope: SCOPES,
@@ -706,7 +705,7 @@ async function exchangeToken(code) {
       client_id: clientId,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: location.href.split('?')[0].split('#')[0],
+      redirect_uri: 'https://play.wsgpolar.tech/beta/pages/music',
       code_verifier: verifier,
     }),
   });
