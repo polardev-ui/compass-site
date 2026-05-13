@@ -652,7 +652,7 @@
 /* ══════════════════════════════════════════
    CONFIG & STATE
 ══════════════════════════════════════════ */
-const SCOPES = 'user-read-private user-read-email playlist-read-private';
+const SCOPES = 'user-read-private user-read-email playlist-read-private user-top-read user-read-recently-played';
 let token = null;
 let clientId = '5b628977108b40c2813f82774884bf64';
 let currentView = 'home';
@@ -840,28 +840,36 @@ function loadView(view, params = {}) {
    HOME
 ══════════════════════════════════════════ */
 async function renderHome() {
-  const [featured, releases] = await Promise.all([
-    api('/browse/featured-playlists?limit=8&country=US'),
+  const [topTracks, topArtists, releases] = await Promise.all([
+    api('/me/top/tracks?limit=8&time_range=short_term'),
+    api('/me/top/artists?limit=8&time_range=short_term'),
     api('/browse/new-releases?limit=8&country=US'),
   ]);
+  const tracks = topTracks?.items || [];
+  currentTrackList = tracks;
   const c = document.getElementById('main-content');
   c.innerHTML = `
     <div class="page-fade-in">
       <div class="sec-header" style="margin-bottom:6px;">
         <div>
           <div class="sec-title">Good <em>${greeting()}</em></div>
-          <div class="sec-sub" style="margin-top:4px;">${featured?.message || 'Featured playlists for you'}</div>
+          <div class="sec-sub" style="margin-top:4px;">Here's what's been on your radar</div>
         </div>
       </div>
       <div style="height:20px;"></div>
+      <div class="sec-header">
+        <span class="sec-title" style="font-size:17px;">Your Top <em>Tracks</em></span>
+        <button class="see-all" onclick="loadView('trending')">Discover more</button>
+      </div>
+      ${tracks.length ? `<div class="track-list" style="margin-bottom:32px;">${tracks.map((t,i) => trackRowHTML(t,i)).join('')}</div>`
+        : `<div class="empty-state" style="margin-bottom:32px;"><div class="empty-icon">🎵</div><div class="empty-text">Listen to more music on Spotify to see your top tracks</div></div>`}
       <div class="home-cols">
         <div>
           <div class="sec-header">
-            <span class="sec-title" style="font-size:17px;">Featured <em>Playlists</em></span>
-            <button class="see-all" onclick="loadView('trending')">See all</button>
+            <span class="sec-title" style="font-size:17px;">Top <em>Artists</em></span>
           </div>
           <div class="cards-grid">
-            ${(featured?.playlists?.items || []).map(p => cardHTML(p, 'playlist', p.id)).join('')}
+            ${(topArtists?.items || []).map(a => cardHTML(a, 'artist', a.id)).join('')}
           </div>
         </div>
         <div>
@@ -888,11 +896,32 @@ function greeting() {
 /* ══════════════════════════════════════════
    TRENDING
 ══════════════════════════════════════════ */
+// Spotify's own curated playlists (stable IDs)
+const CURATED_PLAYLISTS = [
+  { id: '37i9dQZF1DXcBWIGoYBM5M', name: "Today's Top Hits" },
+  { id: '37i9dQZF1DX4JAvHpjipBk', name: 'New Music Friday' },
+  { id: '37i9dQZF1DX0XUsuxWHRQd', name: 'RapCaviar' },
+  { id: '37i9dQZF1DX1lVhptIYRda', name: 'Hot Country' },
+  { id: '37i9dQZF1DX4dyzvuaRJ0n', name: 'mint' },
+  { id: '37i9dQZF1DWXRqgorJj26U', name: 'Rock Classics' },
+  { id: '37i9dQZF1DX4sWSpwq3LiO', name: 'Peaceful Piano' },
+  { id: '37i9dQZF1DX10zKzsJ2jva', name: 'Viva Latino' },
+  { id: '37i9dQZF1DWY4xHrwFBqUj', name: 'Afro Hits' },
+  { id: '37i9dQZF1DX82pCGH5BNOB', name: 'K-Pop Daebak' },
+  { id: '37i9dQZF1DX4o1uurqpNMM', name: 'Jazz Vibes' },
+  { id: '37i9dQZF1DX2sUQwD7tbmL', name: 'Electronic Rising' },
+];
+
+const GENRE_SEARCHES = [
+  'pop','hip-hop','rock','r&b','latin','electronic','jazz','classical',
+  'indie','metal','country','reggae','soul','funk','blues','punk',
+];
+
 async function renderTrending() {
-  const [featured, cats] = await Promise.all([
-    api('/browse/featured-playlists?limit=20&country=US'),
-    api('/browse/categories?limit=20&country=US'),
-  ]);
+  const results = await Promise.all(
+    CURATED_PLAYLISTS.map(p => api(`/playlists/${p.id}?fields=id,name,description,images,tracks.total,external_urls`))
+  );
+  const playlists = results.filter(Boolean);
   const c = document.getElementById('main-content');
   c.innerHTML = `
     <div class="page-fade-in">
@@ -900,51 +929,61 @@ async function renderTrending() {
         <div class="sec-title">Trending <em>Now</em></div>
       </div>
       <div class="cards-grid">
-        ${(featured?.playlists?.items || []).map(p => cardHTML(p, 'playlist', p.id)).join('')}
+        ${playlists.map(p => cardHTML(p, 'playlist', p.id)).join('')}
       </div>
       <div class="sec-header" style="margin-top:8px;">
-        <div class="sec-title" style="font-size:18px;">Browse <em>Categories</em></div>
+        <div class="sec-title" style="font-size:18px;">Browse by <em>Genre</em></div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:24px;">
-        ${(cats?.categories?.items || []).map(cat => `
-          <span class="pill" onclick="loadCategoryPlaylists('${cat.id}','${esc(cat.name)}')">${cat.name}</span>
+        ${GENRE_SEARCHES.map(g => `
+          <span class="pill" onclick="loadGenreSearch('${g}')">${g.charAt(0).toUpperCase()+g.slice(1)}</span>
         `).join('')}
       </div>
     </div>
   `;
 }
 
-async function loadCategoryPlaylists(id, name) {
+async function loadGenreSearch(genre) {
   const c = document.getElementById('main-content');
   c.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
-  const data = await api(`/browse/categories/${id}/playlists?limit=20`);
+  const [artists, playlists] = await Promise.all([
+    api(`/search?q=genre:${encodeURIComponent(genre)}&type=artist&limit=8`),
+    api(`/search?q=${encodeURIComponent(genre)}&type=playlist&limit=8`),
+  ]);
   c.innerHTML = `
     <div class="page-fade-in">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
         <button class="btn-outline" onclick="loadView('trending')">← Back</button>
-        <div class="sec-title">${name}</div>
+        <div class="sec-title">${genre.charAt(0).toUpperCase()+genre.slice(1)}</div>
       </div>
+      <div class="sec-header"><span class="sec-title" style="font-size:17px;">Artists</span></div>
+      <div class="cards-grid" style="margin-bottom:32px;">
+        ${(artists?.artists?.items||[]).map(a => cardHTML(a,'artist',a.id)).join('')}
+      </div>
+      <div class="sec-header"><span class="sec-title" style="font-size:17px;">Playlists</span></div>
       <div class="cards-grid">
-        ${(data?.playlists?.items || []).filter(Boolean).map(p => cardHTML(p, 'playlist', p.id)).join('')}
+        ${(playlists?.playlists?.items||[]).filter(Boolean).map(p => cardHTML(p,'playlist',p.id)).join('')}
       </div>
     </div>
   `;
 }
+
+
 
 /* ══════════════════════════════════════════
    NEW RELEASES
 ══════════════════════════════════════════ */
 async function renderNewReleases() {
   const data = await api('/browse/new-releases?limit=20&country=US');
+  const albums = data?.albums?.items || [];
   const c = document.getElementById('main-content');
   c.innerHTML = `
     <div class="page-fade-in">
       <div class="sec-header">
         <div class="sec-title">New <em>Releases</em></div>
       </div>
-      <div class="cards-grid">
-        ${(data?.albums?.items || []).map(a => cardHTML(a, 'album', a.id)).join('')}
-      </div>
+      ${albums.length ? `<div class="cards-grid">${albums.map(a => cardHTML(a, 'album', a.id)).join('')}</div>`
+        : `<div class="empty-state"><div class="empty-icon">💿</div><div class="empty-text">New releases unavailable</div><div class="empty-sub">Try searching for new music instead</div></div>`}
     </div>
   `;
 }
