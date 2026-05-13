@@ -559,7 +559,6 @@
   <div class="top-bar">
     <a class="logo-mark" href="#">
       <img src="/beta/compass-beta.gif" alt="compassplate">
-      <span>compassplate</span>
     </a>
     <div class="logo-sep"></div>
     <span class="music-tag">Music</span>
@@ -668,15 +667,56 @@ let localPlaylists = JSON.parse(localStorage.getItem('cp_playlists') || '[]');
 /* ══════════════════════════════════════════
    AUTH — PKCE
 ══════════════════════════════════════════ */
+async function generatePKCE() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const verifier = btoa(String.fromCharCode(...array)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return { verifier, challenge };
+}
+
 async function startAuth() {
+  const { verifier, challenge } = await generatePKCE();
+  sessionStorage.setItem('cp_verifier', verifier);
   const params = new URLSearchParams({
     client_id: clientId,
-    response_type: 'token',
+    response_type: 'code',
     redirect_uri: 'https://play.wsgpolar.tech/beta/pages/music',
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
     scope: SCOPES,
-    show_dialog: false,
   });
   location.href = `https://accounts.spotify.com/authorize?${params}`;
+}
+
+async function exchangeToken(code) {
+  const verifier = sessionStorage.getItem('cp_verifier');
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: 'https://play.wsgpolar.tech/beta/pages/music',
+      code_verifier: verifier,
+    }),
+  });
+  return res.json();
+}
+
+async function refreshTokenFn(rt) {
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: rt,
+      client_id: clientId,
+    }),
+  });
+  return res.json();
 }
 
 /* ══════════════════════════════════════════
@@ -688,7 +728,17 @@ async function api(path, opts = {}) {
     headers: { Authorization: `Bearer ${token}`, ...opts.headers },
   });
   if (res.status === 401) {
-    // Token expired — re-auth
+    const rt = localStorage.getItem('cp_refresh_token');
+    if (rt) {
+      const data = await refreshTokenFn(rt);
+      if (data.access_token) {
+        token = data.access_token;
+        localStorage.setItem('cp_access_token', token);
+        localStorage.setItem('cp_token_expires', Date.now() + (data.expires_in || 3600) * 1000);
+        if (data.refresh_token) localStorage.setItem('cp_refresh_token', data.refresh_token);
+        return api(path, opts);
+      }
+    }
     localStorage.removeItem('cp_access_token');
     await startAuth();
     return;
@@ -701,24 +751,32 @@ async function api(path, opts = {}) {
    INIT
 ══════════════════════════════════════════ */
 async function init() {
-  // Implicit grant returns token in URL hash
-  const hash = new URLSearchParams(location.hash.slice(1));
-  const hashToken = hash.get('access_token');
-  const expiresIn = hash.get('expires_in');
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
 
-  if (hashToken) {
-    token = hashToken;
-    const expiresAt = Date.now() + (parseInt(expiresIn) || 3600) * 1000;
-    localStorage.setItem('cp_access_token', token);
-    localStorage.setItem('cp_token_expires', expiresAt);
+  if (code) {
     history.replaceState({}, '', location.pathname);
+    const data = await exchangeToken(code);
+    if (data.access_token) {
+      token = data.access_token;
+      localStorage.setItem('cp_access_token', token);
+      localStorage.setItem('cp_token_expires', Date.now() + (data.expires_in || 3600) * 1000);
+      if (data.refresh_token) localStorage.setItem('cp_refresh_token', data.refresh_token);
+    }
   } else {
     token = localStorage.getItem('cp_access_token');
-    const expiresAt = parseInt(localStorage.getItem('cp_token_expires') || '0');
-    if (token && Date.now() > expiresAt) {
-      // Expired — silently re-auth
-      localStorage.removeItem('cp_access_token');
-      token = null;
+    const exp = parseInt(localStorage.getItem('cp_token_expires') || '0');
+    if (token && Date.now() > exp) {
+      const rt = localStorage.getItem('cp_refresh_token');
+      if (rt) {
+        const data = await refreshTokenFn(rt);
+        if (data.access_token) {
+          token = data.access_token;
+          localStorage.setItem('cp_access_token', token);
+          localStorage.setItem('cp_token_expires', Date.now() + (data.expires_in || 3600) * 1000);
+          if (data.refresh_token) localStorage.setItem('cp_refresh_token', data.refresh_token);
+        } else { token = null; }
+      } else { token = null; }
     }
   }
 
@@ -732,6 +790,7 @@ async function init() {
     setupSearch();
     setupNavItems();
   } else {
+    localStorage.removeItem('cp_access_token');
     await startAuth();
   }
 }
