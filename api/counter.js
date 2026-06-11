@@ -1,18 +1,26 @@
-import { head, put } from '@vercel/blob';
+import { head, put, get } from '@vercel/blob';
 
 export default async function handler(req, res) {
   const filename = 'counter.json';
+  const fallbackCount = 4832; 
 
   try {
-    let currentCount = 0;
+    let currentCount = fallbackCount;
 
     try {
-      const fileData = await head(filename);
-      const response = await fetch(fileData.url);
-      const json = await response.json();
-      currentCount = json.count;
-    } catch (e) {
-      currentCount = 4832;
+      const fileMeta = await head(filename);
+      
+      if (fileMeta && fileMeta.url) {
+        const blobResponse = await get(fileMeta.url);
+        const json = await blobResponse.json();
+        
+        if (json && typeof json.count === 'number') {
+          currentCount = json.count;
+        }
+      }
+    } catch (blobError) {
+      console.log('Blob file not found or unreadable. Initializing baseline history count.');
+      currentCount = fallbackCount;
     }
 
     const newCount = currentCount + 1;
@@ -23,8 +31,9 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({ count: newCount });
+
   } catch (error) {
-    console.error('Blob Storage Error:', error);
-    return res.status(500).json({ count: 4832 });
+    console.error('Fatal Counter Error:', error);
+    return res.status(200).json({ count: fallbackCount });
   }
 }
