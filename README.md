@@ -5,4 +5,4 @@ I recommend you use an ad blocker extension, my external provider is a bit grump
 
 - Compassplate
 
-This is a message from Polar: The original creator of this site, compassplate, was recently found dead in his apartment at 17. His family reached out to me, explaining he had recorded a video for me and others. He wanted me to continue developing this for him, so I will carry out his wish for as long as breath may fill my lungs.
+This is a message from Polar: The original creator of this site, compassplate, was recently found dead in his apartment at 17. His family reached out to me, explaining he had recorded a video for me and others. He wanted me to continue developing this for him, so I will carry out his wish for as long as breath may fill my lungs. They said it was suicide. RIP Hunter Porter, 02.25.2026 Gone too soon.
