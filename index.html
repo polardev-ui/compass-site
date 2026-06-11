@@ -288,17 +288,14 @@
     
     async function fetchLiveCounter() {
       try {
-        const url = 'https://hits.seeyoufarm.com/api/count/incr/badge.json?url=https://play.wsgpolar.tech';
+        const response = await fetch('/api/counter');
+        if (!response.ok) throw new Error('Network issue');
         
-        const response = await fetch(url);
         const data = await response.json();
-        
-        const totalViews = data.value; 
-        
-        updateCounterDisplay(totalViews);
+        updateCounterDisplay(data.count);
       } catch (error) {
         console.error('Could not fetch live counter data:', error);
-        updateCounterDisplay(1234); 
+        updateCounterDisplay(1234);
       }
     }
     
