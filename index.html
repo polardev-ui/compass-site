@@ -257,6 +257,52 @@
     function closeNav() {
       document.getElementById("mySidebar").style.width = "0";
     }
+
+    const totalSlots = 5;
+    const heightPerDigit = 36; 
+    
+    function initCounter() {
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        for (let j = 0; j <= 9; j++) {
+          const div = document.createElement('div');
+          div.className = 'digit-number';
+          div.innerText = j;
+          strip.appendChild(div);
+        }
+      }
+    }
+    
+    function updateCounterDisplay(count) {
+      const countString = String(count).padStart(totalSlots, '0');
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        const digit = parseInt(countString[i]);
+        strip.style.transform = `translateY(-${digit * heightPerDigit}px)`;
+      }
+    }
+    
+    initCounter();
+    
+    async function fetchLiveCounter() {
+      try {
+        const url = 'https://hits.seeyoufarm.com/api/count/incr/badge.json?url=https://play.wsgpolar.tech';
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const totalViews = data.value; 
+        
+        updateCounterDisplay(totalViews);
+      } catch (error) {
+        console.error('Could not fetch live counter data:', error);
+        updateCounterDisplay(1234); 
+      }
+    }
+    
+    fetchLiveCounter();
   </script>
 </body>
 </html>
