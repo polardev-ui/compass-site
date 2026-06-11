@@ -143,6 +143,69 @@
         margin-bottom: 20px;
         margin-left: 27px;
     }
+
+    .counter-container {
+        margin-top: 35px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        filter: blur(10px);
+        transform: translateY(20px);
+        animation: counterEntrance 0.8s 0.4s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+      }
+      
+      .counter-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #818181;
+      }
+      
+      .counter-slots {
+        display: flex;
+        gap: 4px;
+      }
+      
+      .digit-slot {
+        width: 24px;
+        height: 36px;
+        background-color: #111;
+        border: 1px solid #222;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+      
+      .digit-strip {
+        position: absolute;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      .digit-number {
+        width: 24px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25em;
+        font-weight: bold;
+        color: #fff;
+      }
+      
+      @keyframes counterEntrance {
+        to {
+          opacity: 1;
+          filter: blur(0);
+          transform: translateY(0);
+        }
+      }
   </style>
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
@@ -167,6 +230,15 @@
       <input class="search" type="text" placeholder="search...">
       <div class="line"></div>
     </div>
+    <div class="counter-container">
+      <div class="counter-slots" id="counter">
+        <div class="digit-slot"><div class="digit-strip" id="slot-0"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-1"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-2"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-3"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-4"></div></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -188,6 +260,49 @@
     function closeNav() {
       document.getElementById("mySidebar").style.width = "0";
     }
+
+    const totalSlots = 5;
+    const heightPerDigit = 36; 
+    
+    function initCounter() {
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        for (let j = 0; j <= 9; j++) {
+          const div = document.createElement('div');
+          div.className = 'digit-number';
+          div.innerText = j;
+          strip.appendChild(div);
+        }
+      }
+    }
+    
+    function updateCounterDisplay(count) {
+      const countString = String(count).padStart(totalSlots, '0');
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        const digit = parseInt(countString[i]);
+        strip.style.transform = `translateY(-${digit * heightPerDigit}px)`;
+      }
+    }
+    
+    initCounter();
+    
+    async function fetchLiveCounter() {
+      try {
+        const response = await fetch('/api/counter');
+        if (!response.ok) throw new Error('API issue');
+        
+        const data = await response.json();
+        updateCounterDisplay(data.count);
+      } catch (error) {
+        console.error('Could not fetch live counter data:', error);
+        updateCounterDisplay(4832); 
+      }
+    }
+    
+    fetchLiveCounter();
   </script>
 </body>
 </html>
