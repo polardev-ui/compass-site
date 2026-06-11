@@ -1,15 +1,30 @@
+import { head, put } from '@vercel/blob';
+
 export default async function handler(req, res) {
+  const filename = 'counter.json';
+
   try {
-    const url = 'https://hits.seeyoufarm.com/api/count/incr/badge.json?url=https://play.wsgpolar.tech';
-    const apiResponse = await fetch(url);
-    
-    if (!apiResponse.ok) throw new Error('API wrapper failed');
-    
-    const data = await apiResponse.json();
-    
-    return res.status(200).json({ count: data.value });
+    let currentCount = 0;
+
+    try {
+      const fileData = await head(filename);
+      const response = await fetch(fileData.url);
+      const json = await response.json();
+      currentCount = json.count;
+    } catch (e) {
+      currentCount = 4832;
+    }
+
+    const newCount = currentCount + 1;
+
+    await put(filename, JSON.stringify({ count: newCount }), {
+      access: 'public',
+      addRandomSuffix: false, 
+    });
+
+    return res.status(200).json({ count: newCount });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ count: 1 }); 
+    console.error('Blob Storage Error:', error);
+    return res.status(500).json({ count: 4832 });
   }
 }
