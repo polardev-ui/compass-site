@@ -1756,7 +1756,7 @@ const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const IMG_ORIG = 'https://image.tmdb.org/t/p/original';
 const GUEST_HISTORY_KEY = 'history_guest';
 
-let supabase = null;
+let supabaseClient = null;
 let currentUser = null;
 let historyCache = [];
 let authMode = 'signin';
@@ -1827,36 +1827,21 @@ function initStaticIcons() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialQuery = urlParams.get('q')?.trim() || '';
 
-  if (ENV.SUPABASE_URL && ENV.SUPABASE_ANON_KEY) {
-    supabase = window.supabase.createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY);
-    const { data: { session } } = await supabase.auth.getSession();
-    currentUser = session?.user ?? null;
-    await loadHistory();
-    updateProfileUI();
-    renderSettingsAccount();
-    renderHistory();
-    renderContinueWatching();
+  loadHomeContent();
+  if (!initialQuery) loadMoviesGrid();
+  loadTvGrid();
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      const wasGuest = !currentUser;
-      currentUser = session?.user ?? null;
-      if (currentUser && wasGuest) await mergeGuestHistory();
-      await loadHistory();
-      updateProfileUI();
-      renderSettingsAccount();
-      renderHistory();
-      renderContinueWatching();
-    });
-  } else {
-    historyCache = getGuestHistory();
-    renderHistory();
-    renderContinueWatching();
+  if (initialQuery) {
+    document.getElementById('navSearchInput').value = initialQuery;
+    switchTab('movies');
+    document.getElementById('moviesSearch').value = initialQuery;
+    searchContent('movie', initialQuery);
   }
 
   document.getElementById('authGoogleBtn').addEventListener('click', async () => {
-    if (!supabase) { showToast('Sign-in is not configured'); return; }
+    if (!supabaseClient) { showToast('Sign-in is not configured'); return; }
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin + window.location.pathname + window.location.search }
       });
@@ -1867,17 +1852,17 @@ function initStaticIcons() {
   });
 
   document.getElementById('authSubmitBtn').addEventListener('click', async () => {
-    if (!supabase) { showToast('Sign-in is not configured'); return; }
+    if (!supabaseClient) { showToast('Sign-in is not configured'); return; }
     const email = document.getElementById('authEmail').value.trim();
     const pass = document.getElementById('authPassword').value;
     if (!email || !pass) { showToast('Please fill in all fields'); return; }
     try {
       if (authMode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password: pass });
+        const { error } = await supabaseClient.auth.signUp({ email, password: pass });
         if (error) throw error;
         showToast('Account created! Welcome aboard.');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
         if (error) throw error;
       }
       closeAuth();
@@ -1891,17 +1876,44 @@ function initStaticIcons() {
     updateAuthUI();
   });
 
-  loadHomeContent();
-  if (!initialQuery) loadMoviesGrid();
-  loadTvGrid();
-
-  if (initialQuery) {
-    document.getElementById('navSearchInput').value = initialQuery;
-    switchTab('movies');
-    document.getElementById('moviesSearch').value = initialQuery;
-    searchContent('movie', initialQuery);
-  }
+  initSupabase().catch(console.error);
 })();
+
+async function initSupabase() {
+  if (!ENV.SUPABASE_URL || !ENV.SUPABASE_ANON_KEY || !window.supabase) {
+    historyCache = getGuestHistory();
+    renderHistory();
+    renderContinueWatching();
+    return;
+  }
+
+  try {
+    supabaseClient = window.supabase.createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY);
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    currentUser = session?.user ?? null;
+    await loadHistory();
+    updateProfileUI();
+    renderSettingsAccount();
+    renderHistory();
+    renderContinueWatching();
+
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      const wasGuest = !currentUser;
+      currentUser = session?.user ?? null;
+      if (currentUser && wasGuest) await mergeGuestHistory();
+      await loadHistory();
+      updateProfileUI();
+      renderSettingsAccount();
+      renderHistory();
+      renderContinueWatching();
+    });
+  } catch (e) {
+    console.error(e);
+    historyCache = getGuestHistory();
+    renderHistory();
+    renderContinueWatching();
+  }
+}
 
 document.querySelectorAll('.nav-tab').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -2007,8 +2019,8 @@ function updateAuthUI() {
 }
 
 async function signOut() {
-  if (!supabase) return;
-  const { error } = await supabase.auth.signOut();
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.auth.signOut();
   if (error) { showToast(error.message); return; }
   historyCache = getGuestHistory();
   renderHistory();
@@ -2080,8 +2092,8 @@ function historyToRow(item, userId) {
 }
 
 async function loadHistory() {
-  if (currentUser && supabase) {
-    const { data, error } = await supabase
+  if (currentUser && supabaseClient) {
+    const { data, error } = await supabaseClient
       .from('watch_history')
       .select('content_id, content_type, title, poster_path, year, season, episode, watched_at')
       .order('watched_at', { ascending: false })
@@ -2099,9 +2111,9 @@ async function loadHistory() {
 
 async function mergeGuestHistory() {
   const guest = getGuestHistory();
-  if (!guest.length || !supabase || !currentUser) return;
+  if (!guest.length || !supabaseClient || !currentUser) return;
   const rows = guest.map(item => historyToRow(item, currentUser.id));
-  const { error } = await supabase.from('watch_history').upsert(rows, {
+  const { error } = await supabaseClient.from('watch_history').upsert(rows, {
     onConflict: 'user_id,content_id,content_type'
   });
   if (!error) localStorage.removeItem(GUEST_HISTORY_KEY);
@@ -2117,8 +2129,8 @@ async function addHistory(item) {
   historyCache.unshift(entry);
   historyCache = historyCache.slice(0, 50);
 
-  if (currentUser && supabase) {
-    const { error } = await supabase.from('watch_history').upsert(
+  if (currentUser && supabaseClient) {
+    const { error } = await supabaseClient.from('watch_history').upsert(
       historyToRow(entry, currentUser.id),
       { onConflict: 'user_id,content_id,content_type' }
     );
