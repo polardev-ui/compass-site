@@ -1470,26 +1470,30 @@ body {
   background: #000;
   z-index: 950;
   display: none;
-  flex-direction: column;
 }
 
-.player-screen.open { display: flex; animation: fadeIn 0.35s both; }
+.player-screen.open { display: block; animation: fadeIn 0.35s both; }
 
 .player-top {
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 18px 28px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.6));
+  background: linear-gradient(to bottom, rgba(0,0,0,0.82), transparent);
   z-index: 10;
+  pointer-events: none;
 }
+
+.player-top > * { pointer-events: auto; }
 
 .player-title { font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--text); }
 
 .player-close-btn {
-  background: var(--surface);
+  background: rgba(0,0,0,0.55);
   border: 1px solid var(--border);
   color: var(--text);
   font-family: inherit;
@@ -1498,19 +1502,17 @@ body {
   border-radius: var(--radius-pill, 999px);
   cursor: pointer;
   transition: all 0.25s var(--ease-spring);
-  position: relative;
-  z-index: 11;
+  backdrop-filter: blur(8px);
 }
 
-.player-close-btn:hover { background: var(--surface2); transform: scale(1.05); }
+.player-close-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.05); }
 
 .player-iframe {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  min-height: 0;
+  height: 100%;
   border: none;
-  position: relative;
-  z-index: 1;
 }
 
 .auth-modal {
