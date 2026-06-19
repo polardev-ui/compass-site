@@ -2023,24 +2023,26 @@ function userPhotoUrl(user) {
   return user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
 }
 
+function iconSvg(paths, size = 18, fill = 'none') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+}
+
 const ICON = {
-  svg(paths, size = 18, fill = 'none') {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-  },
-  user(s) { return this.svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', s); },
-  film(s) { return this.svg('<path d="M22 11v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3"/><path d="M7 4v16"/><path d="M17 4v16"/><path d="M2 8h4"/><path d="M2 16h4"/><path d="M18 8h4"/><path d="M18 16h4"/>', s); },
-  tv(s) { return this.svg('<rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>', s); },
-  star(s) { return this.svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', s, 'currentColor'); },
-  calendar(s) { return this.svg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>', s); },
-  clock(s) { return this.svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', s); },
-  x(s) { return this.svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', s); },
-  logOut(s) { return this.svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>', s); },
-  arrowRight(s) { return this.svg('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>', s); },
-  arrowLeft(s) { return this.svg('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>', s); }
+  user(s) { return iconSvg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', s); },
+  film(s) { return iconSvg('<path d="M22 11v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3"/><path d="M7 4v16"/><path d="M17 4v16"/><path d="M2 8h4"/><path d="M2 16h4"/><path d="M18 8h4"/><path d="M18 16h4"/>', s); },
+  tv(s) { return iconSvg('<rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>', s); },
+  star(s) { return iconSvg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', s, 'currentColor'); },
+  calendar(s) { return iconSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>', s); },
+  clock(s) { return iconSvg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', s); },
+  x(s) { return iconSvg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', s); },
+  logOut(s) { return iconSvg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>', s); },
+  arrowRight(s) { return iconSvg('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>', s); },
+  arrowLeft(s) { return iconSvg('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>', s); }
 };
 
 function metaItem(iconFn, text) {
-  return `<span class="modal-meta-item meta-ico"><span class="ico-wrap">${iconFn(14)}</span><span>${text}</span></span>`;
+  const svg = typeof iconFn === 'function' ? iconFn(14) : '';
+  return `<span class="modal-meta-item meta-ico"><span class="ico-wrap">${svg}</span><span>${text}</span></span>`;
 }
 
 function initStaticIcons() {
@@ -2837,10 +2839,11 @@ function resetModalSections() {
 }
 
 function getTvSeasons(details) {
-  const fromApi = (details.seasons || [])
-    .filter(s => s.season_number > 0)
-    .sort((a, b) => a.season_number - b.season_number);
-  if (fromApi.length) return fromApi;
+  if (details.seasons && details.seasons.length > 0) {
+    return details.seasons
+      .filter(s => s.season_number >= 0)
+      .sort((a, b) => a.season_number - b.season_number);
+  }
   const count = details.number_of_seasons || 0;
   if (count > 0) {
     return Array.from({ length: count }, (_, i) => ({
@@ -2851,21 +2854,18 @@ function getTvSeasons(details) {
   return [];
 }
 
-async function fetchTmdbJson(url) {
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok || data.status_code >= 40) {
-    throw new Error(data.status_message || `Request failed (${res.status})`);
-  }
-  return data;
-}
-
 async function fetchTvDetails(showId) {
-  return fetchTmdbJson(`${BASE_URL}/tv/${showId}?api_key=${API_KEY}`);
+  const response = await fetch(`${BASE_URL}/tv/${showId}?api_key=${API_KEY}`);
+  const details = await response.json();
+  if (!response.ok) throw new Error(details.status_message || 'Failed to load TV show');
+  return details;
 }
 
 async function fetchMovieDetails(movieId) {
-  return fetchTmdbJson(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}`);
+  const response = await fetch(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}`);
+  const details = await response.json();
+  if (!response.ok) throw new Error(details.status_message || 'Failed to load movie');
+  return details;
 }
 
 async function fetchTvExtras(showId) {
@@ -2911,11 +2911,12 @@ function setupTvSeasons(details, preferredSeason) {
     return false;
   }
   sel.innerHTML = seasons.map(s => {
-    const count = s.episode_count ? ` (${s.episode_count} eps)` : '';
+    const count = s.episode_count != null ? ` (${s.episode_count} eps)` : '';
     return `<option value="${s.season_number}">Season ${s.season_number}${count}</option>`;
   }).join('');
-  const preferred = preferredSeason && seasons.some(s => s.season_number === preferredSeason)
-    ? preferredSeason : seasons[0].season_number;
+  const defaultSeason = seasons.find(s => s.season_number > 0)?.season_number ?? seasons[0].season_number;
+  const preferred = preferredSeason != null && seasons.some(s => s.season_number === preferredSeason)
+    ? preferredSeason : defaultSeason;
   sel.value = String(preferred);
   section.style.display = 'block';
   loadEpisodes();
@@ -3015,6 +3016,7 @@ async function openMovieModal(item) {
 
 async function openTvModal(item) {
   currentModal = { id: item.id, type: 'tv', data: item };
+  tvShowData = item;
   document.getElementById('movieModal').classList.add('open');
   resetModalSections();
   document.getElementById('modalTitle').textContent = item.name || item.title || '';
@@ -3026,23 +3028,21 @@ async function openTvModal(item) {
   let videos = [];
   let reviews = {};
   let credits = {};
-  let detailsLoaded = false;
   try {
-    details = await fetchTvDetails(item.id);
+    const response = await fetch(`${BASE_URL}/tv/${item.id}?api_key=${API_KEY}`);
+    details = await response.json();
+    if (!response.ok) throw new Error(details.status_message || 'Failed to load TV show');
     tvShowData = details;
-    detailsLoaded = true;
     const extras = await fetchTvExtras(item.id);
     videos = extras.videos;
     reviews = extras.reviews;
     credits = extras.credits;
   } catch (e) {
     console.error(e);
-    tvShowData = details;
     document.getElementById('episodeList').innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Could not load show details.</div>';
-    if (!details.name && !details.title) showToast('Could not load TV show details');
+    showToast('Could not load TV show details');
+    return;
   }
-
-  if (!tvShowData?.id) tvShowData = details;
   const poster = details.poster_path ? IMG_BASE + details.poster_path : '';
   const backdrop = details.backdrop_path ? IMG_ORIG + details.backdrop_path : poster;
   const year = details.first_air_date ? new Date(details.first_air_date).getFullYear() : '';
@@ -3076,7 +3076,7 @@ async function openTvModal(item) {
   const showHistory = historyCache.filter(h => h.type === 'tv' && h.id === details.id && h.positionSeconds > 0);
   const lastWatched = showHistory.sort((a, b) => (b.watchedAt || 0) - (a.watchedAt || 0))[0];
   const seasons = getTvSeasons(details);
-  const firstSeason = seasons[0]?.season_number || 1;
+  const firstSeason = seasons.find(s => s.season_number > 0)?.season_number ?? seasons[0]?.season_number ?? 1;
 
   let actionsHtml = '';
   if (lastWatched) {
@@ -3108,7 +3108,7 @@ async function openTvModal(item) {
     if (trailerBtn) trailerBtn.onclick = openTrailer;
   }
 
-  if (detailsLoaded) setupTvSeasons(details, lastWatched?.season);
+  setupTvSeasons(details, lastWatched?.season);
 
   if (videos.length) {
     currentTrailerKey = videos[0].key;
@@ -3125,7 +3125,9 @@ async function openTvModal(item) {
 
 async function startPlayFirstEpisode(details, season) {
   try {
-    const data = await fetchTmdbJson(`${BASE_URL}/tv/${details.id}/season/${season}?api_key=${API_KEY}`);
+    const response = await fetch(`${BASE_URL}/tv/${details.id}/season/${season}?api_key=${API_KEY}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.status_message || 'Failed to load season');
     const ep = (data.episodes || []).find(e => e.episode_number === 1) || (data.episodes || [])[0];
     if (!ep) { showToast('No episodes available'); return; }
     const title = `${details.name} S${season}·E${ep.episode_number}`;
@@ -3145,19 +3147,21 @@ async function startPlayFirstEpisode(details, season) {
 
 async function loadEpisodes() {
   if (!tvShowData?.id) return;
-  const season = parseInt(document.getElementById('seasonSelect').value, 10);
-  if (Number.isNaN(season)) return;
+  const seasonNumber = parseInt(document.getElementById('seasonSelect').value, 10);
+  if (Number.isNaN(seasonNumber)) return;
   const list = document.getElementById('episodeList');
   list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Loading episodes…</div>';
   try {
-    const data = await fetchTmdbJson(`${BASE_URL}/tv/${tvShowData.id}/season/${season}?api_key=${API_KEY}`);
-    const eps = (data.episodes || []).filter(ep => ep.episode_number > 0);
+    const response = await fetch(`${BASE_URL}/tv/${tvShowData.id}/season/${seasonNumber}?api_key=${API_KEY}`);
+    const seasonData = await response.json();
+    if (!response.ok) throw new Error(seasonData.status_message || 'Failed to load episodes');
+    const eps = seasonData.episodes || [];
     if (!eps.length) {
       list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">No episodes found for this season.</div>';
       return;
     }
     list.innerHTML = eps.map(ep => {
-      const existing = historyCache.find(h => historyMatch(h, { id: tvShowData.id, type: 'tv', season: +season, episode: ep.episode_number }));
+      const existing = historyCache.find(h => historyMatch(h, { id: tvShowData.id, type: 'tv', season: +seasonNumber, episode: ep.episode_number }));
       const pct = existing?.positionSeconds > 0 ? progressPercent(existing) : 0;
       const epDate = ep.air_date ? new Date(ep.air_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
       const progHtml = existing?.positionSeconds > 0 ? `
@@ -3167,7 +3171,7 @@ async function loadEpisodes() {
       const metaLine = [epDate, ep.runtime ? `${ep.runtime} min` : ''].filter(Boolean).join(' · ');
       const overviewHtml = ep.overview ? `<div style="color:var(--muted);font-size:0.74rem;margin-top:6px;line-height:1.5;">${truncateText(ep.overview, 140)}</div>` : '';
       return `
-      <div class="episode-item" data-ep="${ep.episode_number}" data-s="${season}" data-runtime="${ep.runtime || 0}">
+      <div class="episode-item" data-ep="${ep.episode_number}" data-s="${seasonNumber}" data-runtime="${ep.runtime || 0}">
         <div class="ep-num">E${ep.episode_number}</div>
         <div class="ep-name">
           <div style="font-weight:600;color:var(--text);">${ep.name || 'Episode ' + ep.episode_number}</div>
