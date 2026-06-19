@@ -644,7 +644,10 @@ body {
   transition: all 0.35s var(--ease-spring);
   border: none; cursor: pointer;
   box-shadow: none;
+  z-index: 2;
 }
+
+.card-play-btn svg { fill: currentColor; }
 
 .card:hover .card-play-btn { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
@@ -723,7 +726,10 @@ body {
   display: flex; align-items: center; justify-content: center;
   border: none; cursor: pointer;
   transition: transform 0.3s var(--ease-spring);
+  z-index: 2;
 }
+
+.card-wide-play svg { fill: currentColor; }
 
 .card-wide:hover .card-wide-play { transform: translate(-50%, -50%) scale(1.1); }
 
@@ -755,7 +761,7 @@ body {
   font-size: 0.78rem;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  z-index: 3;
+  z-index: 10;
   pointer-events: none;
 }
 
@@ -1163,6 +1169,8 @@ body {
   transition: transform 0.3s var(--ease-spring);
 }
 
+.ep-play-icon svg { fill: currentColor; }
+
 .episode-item:hover .ep-play-icon { transform: scale(1.12); }
 
 .trailer-modal {
@@ -1325,21 +1333,19 @@ body {
   z-index: 950;
   display: none;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
 }
 
 .player-screen.open { display: flex; animation: fadeIn 0.35s both; }
 
 .player-top {
-  position: absolute;
-  top: 0; left: 0; right: 0;
+  position: relative;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 18px 28px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
-  z-index: 2;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.6));
+  z-index: 10;
 }
 
 .player-title { font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--text); }
@@ -1354,10 +1360,20 @@ body {
   border-radius: var(--radius-pill, 999px);
   cursor: pointer;
   transition: all 0.25s var(--ease-spring);
+  position: relative;
+  z-index: 11;
 }
 
 .player-close-btn:hover { background: var(--surface2); transform: scale(1.05); }
-.player-iframe { width: 100%; height: 100%; border: none; }
+
+.player-iframe {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  position: relative;
+  z-index: 1;
+}
 
 .auth-modal {
   position: fixed;
@@ -1786,7 +1802,7 @@ body {
 <div class="player-screen" id="playerScreen">
   <div class="player-top">
     <span class="player-title" id="playerTitle"></span>
-    <button class="player-close-btn" onclick="closePlayer()"><span class="ico-wrap" id="playerCloseIco"></span> Close</button>
+    <button class="player-close-btn" id="playerCloseBtn" type="button"><span class="ico-wrap" id="playerCloseIco"></span> Close</button>
   </div>
   <iframe id="playerFrame" class="player-iframe" allow="fullscreen; autoplay" allowfullscreen src=""></iframe>
   <div class="player-progress" id="playerProgress" style="display:none;"></div>
@@ -1961,6 +1977,11 @@ function initStaticIcons() {
   });
 
   initSupabase().catch(console.error);
+
+  document.getElementById('playerCloseBtn').addEventListener('click', closePlayer);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('playerScreen').classList.contains('open')) closePlayer();
+  });
 })();
 
 async function initSupabase() {
@@ -2376,7 +2397,7 @@ function renderContinueWatching() {
         <div class="card-wide-img">
           ${poster ? `<img src="${poster}" alt="${item.title}">` : ''}
           <div class="card-wide-progress"><div class="card-wide-progress-fill" style="width:${pct}%"></div></div>
-          <button class="card-wide-play" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg></button>
+          <button class="card-wide-play" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></button>
         </div>
         <div class="card-wide-title">${item.title}</div>
         <div class="card-wide-sub">${sub || item.type.toUpperCase()}</div>
@@ -2492,7 +2513,7 @@ function cardHTML(item, type) {
         ${rating ? `<div class="card-rating"><span class="ico-wrap">${ICON.star(10)}</span> ${rating}</div>` : ''}
         <div class="card-overlay"></div>
         <button class="card-play-btn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
         </button>
       </div>
       <div class="card-title">${title}</div>
@@ -2780,7 +2801,7 @@ async function loadEpisodes() {
         <div class="ep-num">E${ep.episode_number}</div>
         <div class="ep-name">${ep.name}${ep.runtime ? `<span style="color:var(--muted);font-size:0.74rem;display:block;margin-top:2px;">${ep.runtime} min</span>` : ''}${progHtml}</div>
         <div class="ep-play-icon">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
         </div>
       </div>
     `;
@@ -2898,15 +2919,17 @@ function openPlayer(url, title) {
 
 async function closePlayer() {
   stopProgressTracking();
-  await saveWatchProgress();
-  activeWatch = null;
   document.getElementById('playerScreen').classList.remove('open');
   document.getElementById('playerFrame').src = '';
   document.getElementById('playerProgress').style.display = 'none';
+  await saveWatchProgress();
+  activeWatch = null;
   renderContinueWatching();
   renderHistory();
   renderSettingsAccount();
 }
+
+window.closePlayer = closePlayer;
 
 let toastTimer;
 function showToast(msg) {
