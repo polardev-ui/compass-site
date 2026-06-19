@@ -1,5 +1,4 @@
-<html lang="en"> <!-- If you can read this, and can understand this
-    code, you should come work with us: nzezmw@gmail.com Email us. -->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -48,7 +47,7 @@
         background: 0;
         border: 0;
         outline: none;
-        width: 100%; 
+        width: 100%;
         font-size: 1.5em;
         transition: padding 0.3s 0.2s ease;
         color: white;
@@ -91,18 +90,17 @@
     </div>
     <script>
     const input = document.querySelector('input');
-    const API = 'api_masbdvh';
-    
+    const API_URL = '/api/ai-chat';
+
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             const userMessage = input.value;
             input.value = '';
-            
-            fetch('https://api.wsgpolar.me/v1/ai/chat', {
+
+            fetch(API_URL, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${API}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     model: 'llama-3.1-8b-instant',
@@ -128,8 +126,7 @@
     });
 
     const chatContainer = document.getElementById('');
-    
-    // too lazy to implement
+
     function appendMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;

@@ -209,8 +209,7 @@
 <div id="toast"></div>
 
 <script>
-const API_KEY     = 'api_masbdvh';
-const API_URL     = 'https://api.wsgpolar.me/v1/ai/chat';
+const API_URL     = '/api/ai-chat';
 const MODEL       = 'llama-3.1-8b-instant';
 const MAX_MSGS    = 15;
 const STORAGE_KEY = 'zeta_history';
@@ -422,7 +421,7 @@ async function sendMessage() {
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: MODEL, messages: [{ role: 'system', content: SYSTEM }, ...history] })
     });
     const data = await res.json();

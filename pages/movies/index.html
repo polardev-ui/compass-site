@@ -245,7 +245,7 @@
       background: 0;
       border: 0;
       outline: none;
-      width: 100%; 
+      width: 100%;
       font-size: 1.5em;
       transition: padding 0.3s 0.2s ease;
       color: white;
@@ -639,30 +639,27 @@
             <button id="logoutBtn" class="profile-dropdown-item">Log Out</button>
         </div>
     </div>
-    
+
     <select id="typeSelector" class="type-selector">
         <option value="movie">Movies</option>
         <option value="tv">TV Shows</option>
     </select>
-    
+
     <img src="/compass.gif" alt="logo" class="anchor-logo">
-    
+
     <div class="container">
         <h1 id="pageTitle">movies</h1>
 
-        <!-- Recently Watched Section -->
         <div id="recentlyWatchedSection" class="content-section" style="display: none;">
             <div class="section-title">Recently Watched</div>
             <div id="recentlyWatchedGrid" class="section-grid"></div>
         </div>
 
-        <!-- Recommended Section -->
         <div id="recommendedSection" class="content-section" style="display: none;">
             <div class="section-title">Recommended For You</div>
             <div id="recommendedGrid" class="section-grid"></div>
         </div>
 
-        <!-- Popular Section -->
         <div id="popularSection" class="content-section">
             <div class="section-title">Popular</div>
             <div id="popularGrid" class="section-grid"></div>
@@ -746,14 +743,12 @@
       const profilePic = document.getElementById('profilePic');
       if (currentUser) {
         if (currentUser.photoURL) {
-          // Use Google profile picture
           profilePic.style.backgroundImage = `url(${currentUser.photoURL})`;
           profilePic.style.backgroundSize = 'cover';
           profilePic.style.backgroundPosition = 'center';
           profilePic.textContent = '';
           profilePic.style.backgroundColor = 'transparent';
         } else {
-          // Use first letter of email with generated color
           profilePic.style.backgroundImage = 'none';
           profilePic.textContent = currentUser.email.charAt(0).toUpperCase();
           profilePic.style.backgroundColor = generateColorFromEmail(currentUser.email);
@@ -844,7 +839,6 @@
           authEmail.value = '';
           authPassword.value = '';
           isSignupMode = false;
-          // Update UI labels
           authTitle.textContent = 'Sign In';
           authSubmitBtn.textContent = 'Sign In with Email';
           document.getElementById('authToggleText').textContent = "Don't have an account?";
@@ -871,7 +865,6 @@
         if (error.code === 'auth/popup-blocked') {
           alert('Pop-up was blocked. Please check your browser settings.');
         } else if (error.code === 'auth/cancelled-popup-request') {
-          // User cancelled, no need to show alert
         } else {
           alert('Google sign in error: ' + error.message);
         }
@@ -892,17 +885,12 @@
     });
 
     async function trackWatchHistory(mediaId, mediaType, title, posterPath, season = null, episode = null) {
-      // Watch history tracking disabled - requires backend implementation
-      // In the future, this can be integrated with Firebase Realtime Database or Firestore
       if (!currentUser) return;
-      
-      // TODO: Implement watch history tracking with Firebase
+
     }
 
     (async () => {
       await waitForConfig();
-      // Firebase authentication is already initialized at the top of the script
-      // Auth state changes are handled by the onAuthStateChanged listener
     })();
     </script>
     <script>
@@ -912,8 +900,8 @@
     const BASE_URL = 'https://api.themoviedb.org/3';
     const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 
-    let currentType = 'movie'; 
-    let currentTvShow = null; 
+    let currentType = 'movie';
+    let currentTvShow = null;
 
     const backButton = document.querySelector('.back');
     const searchInput = document.getElementById('searchInput');
@@ -954,11 +942,10 @@
         searchContent();
     }
 
-    // Helper function to create content cards
     function createContentCard(item, type = 'movie') {
         const posterPath = item.poster_path ? IMG_BASE + item.poster_path : '/placeholder.png';
         const title = type === 'tv' ? item.name : item.title;
-        
+
         const card = document.createElement('div');
         card.className = 'content-card';
         card.innerHTML = `
@@ -973,23 +960,19 @@
             } else {
                 openMovieModal(item);
             }
-            // Track as watched
             addToRecentlyWatched(item.id, type, title, item.poster_path);
         });
         return card;
     }
 
-    // Recently watched management (localStorage based)
     function addToRecentlyWatched(id, type, title, posterPath) {
         if (!currentUser) return;
-        
+
         const key = 'recentlyWatched_' + currentUser.uid;
         let watched = JSON.parse(localStorage.getItem(key) || '[]');
-        
-        // Remove if already exists
+
         watched = watched.filter(item => !(item.id === id && item.type === type));
-        
-        // Add to front
+
         watched.unshift({
             id,
             type,
@@ -997,8 +980,7 @@
             posterPath,
             watchedAt: new Date().toISOString()
         });
-        
-        // Keep only last 10
+
         watched = watched.slice(0, 10);
         localStorage.setItem(key, JSON.stringify(watched));
     }
@@ -1006,20 +988,20 @@
     function displayRecentlyWatched() {
         const section = document.getElementById('recentlyWatchedSection');
         const grid = document.getElementById('recentlyWatchedGrid');
-        
+
         if (!currentUser) {
             section.style.display = 'none';
             return;
         }
-        
+
         const key = 'recentlyWatched_' + currentUser.uid;
         const watched = JSON.parse(localStorage.getItem(key) || '[]');
-        
+
         if (watched.length === 0) {
             section.style.display = 'none';
             return;
         }
-        
+
         grid.innerHTML = '';
         watched.forEach(item => {
             const posterPath = item.posterPath ? IMG_BASE + item.posterPath : '/placeholder.png';
@@ -1047,13 +1029,13 @@
         try {
             const section = document.getElementById('popularSection');
             const grid = document.getElementById('popularGrid');
-            
+
             grid.innerHTML = '<div class="loader" style="grid-column: 1/-1;">Loading...</div>';
-            
+
             const endpoint = currentType === 'tv' ? 'tv/popular' : 'movie/popular';
             const response = await fetch(`${BASE_URL}/${endpoint}?api_key=${API_KEY}&page=1`);
             const data = await response.json();
-            
+
             grid.innerHTML = '';
             if (data.results) {
                 data.results.slice(0, 12).forEach(item => {
@@ -1065,7 +1047,6 @@
         }
     }
 
-    // Update type selector to reload content
     typeSelector.addEventListener('change', async (e) => {
         currentType = e.target.value;
         moviesContainer.innerHTML = '';
@@ -1104,7 +1085,7 @@
             data.results.forEach(item => {
                 const posterPath = item.poster_path ? IMG_BASE + item.poster_path : '/placeholder.png';
                 const title = currentType === 'tv' ? item.name : item.title;
-                const year = currentType === 'tv' 
+                const year = currentType === 'tv'
                     ? new Date(item.first_air_date).getFullYear() || 'N/A'
                     : new Date(item.release_date).getFullYear() || 'N/A';
 
@@ -1248,11 +1229,9 @@
         trackWatchHistory(tvShowId, 'tv', title, posterPath, seasonNumber, episodeNumber);
     };
 
-    // Initialize homepage with popular content and recently watched
     displayRecentlyWatched();
     loadPopularContent();
 
-    // Re-display recently watched when auth state changes
     const originalUpdateProfileUI = window.updateProfileUI;
     window.updateProfileUI = function() {
         originalUpdateProfileUI();

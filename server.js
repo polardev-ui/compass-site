@@ -32,6 +32,22 @@ function loadEnv() {
 
 const env = loadEnv();
 
+function getPublicConfig() {
+  return {
+    SUPABASE_URL: env.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY || '',
+    TMDB_API_KEY: env.TMDB_API_KEY || '',
+    SPOTIFY_CLIENT_ID: env.SPOTIFY_CLIENT_ID || '',
+    FIREBASE_API_KEY: env.FIREBASE_API_KEY || '',
+    FIREBASE_AUTH_DOMAIN: env.FIREBASE_AUTH_DOMAIN || '',
+    FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID || '',
+    FIREBASE_STORAGE_BUCKET: env.FIREBASE_STORAGE_BUCKET || '',
+    FIREBASE_MESSAGING_SENDER_ID: env.FIREBASE_MESSAGING_SENDER_ID || '',
+    FIREBASE_APP_ID: env.FIREBASE_APP_ID || '',
+    FIREBASE_MEASUREMENT_ID: env.FIREBASE_MEASUREMENT_ID || ''
+  };
+}
+
 function isBotUA(userAgent = '') {
   const botPatterns = [
     /bot/i, /crawler/i, /spider/i, /scraper/i, /curl/i, /wget/i,
@@ -45,6 +61,57 @@ function isBotUA(userAgent = '') {
 function handleAPIRequest(req, res) {
   const urlObj = new url.URL(req.url, `http://${req.headers.host}`);
   const pathname = urlObj.pathname;
+
+  if (pathname === '/api/config' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getPublicConfig()));
+    return true;
+  }
+
+  if (pathname === '/api/counter' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ count: parseInt(env.COUNTER_BASE || '4832', 10) }));
+    return true;
+  }
+
+  if (pathname === '/api/ai-chat' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+      if (body.length > 1024 * 100) {
+        res.writeHead(413);
+        res.end('Payload too large');
+      }
+    });
+
+    req.on('end', async () => {
+      try {
+        const { model, messages } = JSON.parse(body);
+        const apiKey = env.AI_API_KEY;
+        if (!apiKey) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'AI service not configured' }));
+          return;
+        }
+
+        const response = await fetch('https://api.wsgpolar.me/v1/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ model, messages })
+        });
+        const data = await response.json();
+        res.writeHead(response.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message || 'AI request failed' }));
+      }
+    });
+    return true;
+  }
 
   if (pathname === '/api/scramjet/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

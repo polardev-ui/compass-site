@@ -32,7 +32,7 @@
       background: 0;
       border: 0;
       outline: none;
-      width: 100%; 
+      width: 100%;
       font-size: 1.5em;
       transition: padding 0.3s 0.2s ease;
       color: white;
@@ -155,19 +155,19 @@
         transform: translateY(20px);
         animation: counterEntrance 0.8s 0.4s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
       }
-      
+
       .counter-label {
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 2px;
         color: #818181;
       }
-      
+
       .counter-slots {
         display: flex;
         gap: 4px;
       }
-      
+
       .digit-slot {
         width: 24px;
         height: 36px;
@@ -179,7 +179,7 @@
         display: flex;
         justify-content: center;
       }
-      
+
       .digit-strip {
         position: absolute;
         top: 0;
@@ -187,7 +187,7 @@
         flex-direction: column;
         transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
-      
+
       .digit-number {
         width: 24px;
         height: 36px;
@@ -198,7 +198,7 @@
         font-weight: bold;
         color: #fff;
       }
-      
+
       @keyframes counterEntrance {
         to {
           opacity: 1;
@@ -243,7 +243,7 @@
 
   <script>
     const searchInput = document.querySelector('.search');
-    
+
     searchInput.addEventListener('keypress', function(event) {
       if (event.key === 'Enter') {
         const query = searchInput.value.trim();
@@ -262,8 +262,8 @@
     }
 
     const totalSlots = 5;
-    const heightPerDigit = 36; 
-    
+    const heightPerDigit = 36;
+
     function initCounter() {
       for (let i = 0; i < totalSlots; i++) {
         const strip = document.getElementById(`slot-${i}`);
@@ -276,7 +276,7 @@
         }
       }
     }
-    
+
     function updateCounterDisplay(count) {
       const countString = String(count).padStart(totalSlots, '0');
       for (let i = 0; i < totalSlots; i++) {
@@ -286,22 +286,22 @@
         strip.style.transform = `translateY(-${digit * heightPerDigit}px)`;
       }
     }
-    
+
     initCounter();
-    
+
     async function fetchLiveCounter() {
       try {
         const response = await fetch('/api/counter');
         if (!response.ok) throw new Error('API issue');
-        
+
         const data = await response.json();
         updateCounterDisplay(data.count);
       } catch (error) {
         console.error('Could not fetch live counter data:', error);
-        updateCounterDisplay(4832); 
+        updateCounterDisplay(4832);
       }
     }
-    
+
     fetchLiveCounter();
   </script>
 </body>
