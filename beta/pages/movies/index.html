@@ -1888,6 +1888,14 @@ body {
         </div>
       </div>
 
+      <div class="seasons-section" id="seasonsSection" style="display:none;">
+        <div class="seasons-header">
+          <span class="modal-section-title" style="margin-bottom:0;">Episodes</span>
+          <select class="season-select" id="seasonSelect"></select>
+        </div>
+        <div class="episode-list" id="episodeList"></div>
+      </div>
+
       <div id="modalCastSection" style="display:none;">
         <div class="modal-section-title">Cast</div>
         <div class="cast-row" id="modalCast"></div>
@@ -1902,14 +1910,6 @@ body {
           </div>
           <div class="trailer-label" id="trailerLabel"></div>
         </div>
-      </div>
-
-      <div class="seasons-section" id="seasonsSection" style="display:none;">
-        <div class="seasons-header">
-          <span class="modal-section-title" style="margin-bottom:0;">Episodes</span>
-          <select class="season-select" id="seasonSelect" onchange="loadEpisodes()"></select>
-        </div>
-        <div class="episode-list" id="episodeList"></div>
       </div>
 
       <div class="reviews-section" id="reviewsSection" style="display:none;">
@@ -2127,6 +2127,7 @@ function initStaticIcons() {
   initSupabase().catch(console.error);
 
   document.getElementById('playerCloseBtn').addEventListener('click', closePlayer);
+  document.getElementById('seasonSelect').addEventListener('change', loadEpisodes);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('playerScreen').classList.contains('open')) closePlayer();
   });
@@ -2831,6 +2832,94 @@ function resetModalSections() {
   document.getElementById('modalTagline').style.display = 'none';
   document.getElementById('modalScoreRow').innerHTML = '';
   document.getElementById('modalActions').innerHTML = '';
+  document.getElementById('episodeList').innerHTML = '';
+  document.getElementById('seasonSelect').innerHTML = '';
+}
+
+function getTvSeasons(details) {
+  const fromApi = (details.seasons || [])
+    .filter(s => s.season_number > 0)
+    .sort((a, b) => a.season_number - b.season_number);
+  if (fromApi.length) return fromApi;
+  const count = details.number_of_seasons || 0;
+  if (count > 0) {
+    return Array.from({ length: count }, (_, i) => ({
+      season_number: i + 1,
+      episode_count: null
+    }));
+  }
+  return [];
+}
+
+async function fetchTmdbJson(url) {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok || data.status_code >= 40) {
+    throw new Error(data.status_message || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+async function fetchTvDetails(showId) {
+  return fetchTmdbJson(`${BASE_URL}/tv/${showId}?api_key=${API_KEY}`);
+}
+
+async function fetchMovieDetails(movieId) {
+  return fetchTmdbJson(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}`);
+}
+
+async function fetchTvExtras(showId) {
+  const empty = { videos: [], reviews: {}, credits: {} };
+  if (!API_KEY) return empty;
+  const urls = [
+    `${BASE_URL}/tv/${showId}/videos?api_key=${API_KEY}`,
+    `${BASE_URL}/tv/${showId}/reviews?api_key=${API_KEY}`,
+    `${BASE_URL}/tv/${showId}/credits?api_key=${API_KEY}`
+  ];
+  const results = await Promise.allSettled(urls.map(u => fetch(u).then(r => r.json())));
+  const videos = (results[0].status === 'fulfilled' ? results[0].value.results || [] : [])
+    .filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+  const reviews = results[1].status === 'fulfilled' ? results[1].value : {};
+  const credits = results[2].status === 'fulfilled' ? results[2].value : {};
+  return { videos, reviews, credits };
+}
+
+async function fetchMovieExtras(movieId) {
+  const empty = { videos: [], reviews: {}, credits: {} };
+  if (!API_KEY) return empty;
+  const urls = [
+    `${BASE_URL}/movie/${movieId}/videos?api_key=${API_KEY}`,
+    `${BASE_URL}/movie/${movieId}/reviews?api_key=${API_KEY}`,
+    `${BASE_URL}/movie/${movieId}/credits?api_key=${API_KEY}`
+  ];
+  const results = await Promise.allSettled(urls.map(u => fetch(u).then(r => r.json())));
+  const videos = (results[0].status === 'fulfilled' ? results[0].value.results || [] : [])
+    .filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+  const reviews = results[1].status === 'fulfilled' ? results[1].value : {};
+  const credits = results[2].status === 'fulfilled' ? results[2].value : {};
+  return { videos, reviews, credits };
+}
+
+function setupTvSeasons(details, preferredSeason) {
+  const seasons = getTvSeasons(details);
+  const section = document.getElementById('seasonsSection');
+  const sel = document.getElementById('seasonSelect');
+  if (!seasons.length) {
+    section.style.display = 'block';
+    sel.innerHTML = '';
+    document.getElementById('episodeList').innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">No seasons available for this show.</div>';
+    return false;
+  }
+  sel.innerHTML = seasons.map(s => {
+    const count = s.episode_count ? ` (${s.episode_count} eps)` : '';
+    return `<option value="${s.season_number}">Season ${s.season_number}${count}</option>`;
+  }).join('');
+  const preferred = preferredSeason && seasons.some(s => s.season_number === preferredSeason)
+    ? preferredSeason : seasons[0].season_number;
+  sel.value = String(preferred);
+  section.style.display = 'block';
+  loadEpisodes();
+  return true;
 }
 
 async function openMovieModal(item) {
@@ -2845,18 +2934,15 @@ async function openMovieModal(item) {
   let reviews = {};
   let credits = {};
   try {
-    const [detailRes, videoRes, reviewRes, creditRes] = await Promise.all([
-      fetch(`${BASE_URL}/movie/${item.id}?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/movie/${item.id}/videos?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/movie/${item.id}/reviews?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/movie/${item.id}/credits?api_key=${API_KEY}`)
-    ]);
-    details = await detailRes.json();
-    const vd = await videoRes.json();
-    videos = (vd.results || []).filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-    reviews = await reviewRes.json();
-    credits = await creditRes.json();
-  } catch (e) {}
+    details = await fetchMovieDetails(item.id);
+    const extras = await fetchMovieExtras(item.id);
+    videos = extras.videos;
+    reviews = extras.reviews;
+    credits = extras.credits;
+  } catch (e) {
+    console.error(e);
+    if (!details.title) showToast('Could not load movie details');
+  }
 
   const poster = details.poster_path ? IMG_BASE + details.poster_path : '';
   const backdrop = details.backdrop_path ? IMG_ORIG + details.backdrop_path : poster;
@@ -2931,28 +3017,32 @@ async function openTvModal(item) {
   currentModal = { id: item.id, type: 'tv', data: item };
   document.getElementById('movieModal').classList.add('open');
   resetModalSections();
-  document.getElementById('modalTitle').textContent = item.name || '';
+  document.getElementById('modalTitle').textContent = item.name || item.title || '';
   document.getElementById('modalOverview').textContent = item.overview || 'Loading details…';
+  document.getElementById('seasonsSection').style.display = 'block';
+  document.getElementById('episodeList').innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Loading seasons…</div>';
 
   let details = item;
   let videos = [];
   let reviews = {};
   let credits = {};
+  let detailsLoaded = false;
   try {
-    const [detailRes, videoRes, reviewRes, creditRes] = await Promise.all([
-      fetch(`${BASE_URL}/tv/${item.id}?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/tv/${item.id}/videos?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/tv/${item.id}/reviews?api_key=${API_KEY}`),
-      fetch(`${BASE_URL}/tv/${item.id}/credits?api_key=${API_KEY}`)
-    ]);
-    details = await detailRes.json();
-    const vd = await videoRes.json();
-    videos = (vd.results || []).filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-    reviews = await reviewRes.json();
-    credits = await creditRes.json();
-  } catch (e) {}
+    details = await fetchTvDetails(item.id);
+    tvShowData = details;
+    detailsLoaded = true;
+    const extras = await fetchTvExtras(item.id);
+    videos = extras.videos;
+    reviews = extras.reviews;
+    credits = extras.credits;
+  } catch (e) {
+    console.error(e);
+    tvShowData = details;
+    document.getElementById('episodeList').innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Could not load show details.</div>';
+    if (!details.name && !details.title) showToast('Could not load TV show details');
+  }
 
-  tvShowData = details;
+  if (!tvShowData?.id) tvShowData = details;
   const poster = details.poster_path ? IMG_BASE + details.poster_path : '';
   const backdrop = details.backdrop_path ? IMG_ORIG + details.backdrop_path : poster;
   const year = details.first_air_date ? new Date(details.first_air_date).getFullYear() : '';
@@ -2964,8 +3054,8 @@ async function openTvModal(item) {
 
   document.getElementById('modalBackdrop').src = backdrop;
   document.getElementById('modalPoster').src = poster;
-  document.getElementById('modalPoster').alt = details.name;
-  document.getElementById('modalTitle').textContent = details.name || '';
+  document.getElementById('modalPoster').alt = details.name || details.title || '';
+  document.getElementById('modalTitle').textContent = details.name || details.title || '';
   document.getElementById('modalOverview').textContent = details.overview || 'No overview available.';
 
   document.getElementById('modalTagline').style.display = 'none';
@@ -2985,7 +3075,7 @@ async function openTvModal(item) {
 
   const showHistory = historyCache.filter(h => h.type === 'tv' && h.id === details.id && h.positionSeconds > 0);
   const lastWatched = showHistory.sort((a, b) => (b.watchedAt || 0) - (a.watchedAt || 0))[0];
-  const seasons = (details.seasons || []).filter(s => s.season_number > 0);
+  const seasons = getTvSeasons(details);
   const firstSeason = seasons[0]?.season_number || 1;
 
   let actionsHtml = '';
@@ -3013,15 +3103,12 @@ async function openTvModal(item) {
   } else if (seasons.length) {
     document.getElementById('modalPlayFirstBtn').onclick = () => startPlayFirstEpisode(details, firstSeason);
   }
-  if (videos.length) document.getElementById('modalTrailerBtn').onclick = openTrailer;
-
-  if (seasons.length) {
-    const sel = document.getElementById('seasonSelect');
-    sel.innerHTML = seasons.map(s => `<option value="${s.season_number}">Season ${s.season_number} (${s.episode_count || '?'} eps)</option>`).join('');
-    if (lastWatched?.season) sel.value = String(lastWatched.season);
-    document.getElementById('seasonsSection').style.display = 'block';
-    loadEpisodes();
+  if (videos.length) {
+    const trailerBtn = document.getElementById('modalTrailerBtn');
+    if (trailerBtn) trailerBtn.onclick = openTrailer;
   }
+
+  if (detailsLoaded) setupTvSeasons(details, lastWatched?.season);
 
   if (videos.length) {
     currentTrailerKey = videos[0].key;
@@ -3038,32 +3125,37 @@ async function openTvModal(item) {
 
 async function startPlayFirstEpisode(details, season) {
   try {
-    const res = await fetch(`${BASE_URL}/tv/${details.id}/season/${season}?api_key=${API_KEY}`);
-    const data = await res.json();
-    const ep = (data.episodes || []).find(e => e.episode_number === 1);
-    if (!ep) return;
-    const title = `${details.name} S${season}·E1`;
+    const data = await fetchTmdbJson(`${BASE_URL}/tv/${details.id}/season/${season}?api_key=${API_KEY}`);
+    const ep = (data.episodes || []).find(e => e.episode_number === 1) || (data.episodes || [])[0];
+    if (!ep) { showToast('No episodes available'); return; }
+    const title = `${details.name} S${season}·E${ep.episode_number}`;
     const watchItem = {
       id: details.id, type: 'tv', title: details.name,
       posterPath: details.poster_path,
-      season, episode: 1,
+      season: +season, episode: ep.episode_number,
       durationSeconds: (ep.runtime || 0) * 60,
       positionSeconds: 0
     };
-    startFetching(() => playTv(details.id, season, 1, title, watchItem));
-  } catch (e) {}
+    startFetching(() => playTv(details.id, +season, ep.episode_number, title, watchItem));
+  } catch (e) {
+    console.error(e);
+    showToast('Could not load episode');
+  }
 }
 
 async function loadEpisodes() {
-  if (!tvShowData) return;
-  const season = document.getElementById('seasonSelect').value;
+  if (!tvShowData?.id) return;
+  const season = parseInt(document.getElementById('seasonSelect').value, 10);
+  if (Number.isNaN(season)) return;
   const list = document.getElementById('episodeList');
   list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Loading episodes…</div>';
   try {
-    const res = await fetch(`${BASE_URL}/tv/${tvShowData.id}/season/${season}?api_key=${API_KEY}`);
-    const data = await res.json();
-    const eps = data.episodes || [];
-    if (!eps.length) { list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">No episodes found.</div>'; return; }
+    const data = await fetchTmdbJson(`${BASE_URL}/tv/${tvShowData.id}/season/${season}?api_key=${API_KEY}`);
+    const eps = (data.episodes || []).filter(ep => ep.episode_number > 0);
+    if (!eps.length) {
+      list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">No episodes found for this season.</div>';
+      return;
+    }
     list.innerHTML = eps.map(ep => {
       const existing = historyCache.find(h => historyMatch(h, { id: tvShowData.id, type: 'tv', season: +season, episode: ep.episode_number }));
       const pct = existing?.positionSeconds > 0 ? progressPercent(existing) : 0;
@@ -3091,9 +3183,9 @@ async function loadEpisodes() {
     }).join('');
     list.querySelectorAll('.episode-item').forEach(el => {
       el.addEventListener('click', () => {
-        const ep = +el.dataset.ep;
-        const s = +el.dataset.s;
-        const runtime = (+el.dataset.runtime || 0) * 60;
+        const ep = parseInt(el.dataset.ep, 10);
+        const s = parseInt(el.dataset.s, 10);
+        const runtime = (parseInt(el.dataset.runtime, 10) || 0) * 60;
         const title = `${tvShowData.name} S${s}·E${ep}`;
         const existing = historyCache.find(h => historyMatch(h, { id: tvShowData.id, type: 'tv', season: s, episode: ep }));
         const watchItem = {
@@ -3107,9 +3199,12 @@ async function loadEpisodes() {
       });
     });
   } catch (e) {
-    list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Error loading episodes.</div>';
+    console.error(e);
+    list.innerHTML = '<div style="color:var(--muted);padding:12px;font-size:0.82rem;">Error loading episodes. Try another season.</div>';
   }
 }
+
+window.loadEpisodes = loadEpisodes;
 
 document.getElementById('modalClose').addEventListener('click', closeMovieModal);
 document.getElementById('movieModal').addEventListener('click', e => {
@@ -3182,18 +3277,20 @@ function playMovie(id, title, watchMeta = {}) {
 }
 
 function playTv(id, season, episode, title, watchMeta = {}) {
+  const s = parseInt(season, 10);
+  const ep = parseInt(episode, 10);
   const pos = watchMeta.positionSeconds || 0;
   const watchItem = {
     id, type: 'tv', title: watchMeta.title || title,
     posterPath: watchMeta.posterPath || null,
-    season, episode,
+    season: s, episode: ep,
     positionSeconds: pos,
     durationSeconds: watchMeta.durationSeconds || 0
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
   const startAt = pos > 0 ? `&startAt=${pos}` : '';
-  const url = `https://vidfast.me/tv/${id}/${season}/${episode}?autoPlay=true${startAt}`;
+  const url = `https://vidfast.me/tv/${id}/${s}/${ep}?autoPlay=true${startAt}`;
   openPlayer(url, title);
 }
 
