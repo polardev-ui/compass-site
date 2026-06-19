@@ -6,10 +6,12 @@ create table if not exists public.watch_history (
   title text not null,
   poster_path text,
   year text,
-  season integer,
-  episode integer,
+  season integer not null default 0,
+  episode integer not null default 0,
+  position_seconds integer not null default 0,
+  duration_seconds integer not null default 0,
   watched_at timestamptz not null default now(),
-  unique (user_id, content_id, content_type)
+  unique (user_id, content_id, content_type, season, episode)
 );
 
 create index if not exists watch_history_user_watched_idx
