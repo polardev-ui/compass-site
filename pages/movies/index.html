@@ -630,13 +630,13 @@
     .ad-popup-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
       z-index: 9999;
       display: none;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 20px;
-      backdrop-filter: blur(8px);
+      padding-top: 60px;
+      pointer-events: none;
     }
 
     .ad-popup {
@@ -649,6 +649,8 @@
       text-align: center;
       position: relative;
       animation: adPopIn 0.4s ease;
+      pointer-events: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
     }
 
     @keyframes adPopIn {
