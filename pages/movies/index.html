@@ -626,10 +626,93 @@
         padding: 20px;
         color: #888;
     }
+
+    .ad-popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+
+    .ad-popup {
+      background: #1a1a1a;
+      border: 2px solid #e50914;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      animation: adPopIn 0.4s ease;
+    }
+
+    @keyframes adPopIn {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .ad-popup h2 {
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      color: #e50914;
+      font-size: 1.8em;
+      margin-bottom: 20px;
+    }
+
+    .ad-popup p {
+      color: #ccc;
+      font-size: 0.95em;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .ad-popup .ad-download-btn {
+      display: inline-block;
+      background: #e50914;
+      color: white;
+      padding: 14px 30px;
+      border-radius: 5px;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 1.1em;
+      transition: background 0.3s;
+    }
+
+    .ad-popup .ad-download-btn:hover {
+      background: #c20812;
+    }
+
+    .ad-popup .ad-dismiss {
+      display: block;
+      margin-top: 15px;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.85em;
+      background: none;
+      border: none;
+      text-decoration: underline;
+      font-family: inherit;
+    }
+
+    .ad-popup .ad-dismiss:hover {
+      color: #fff;
+    }
     </style>
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
 <body>
+<div id="adPopup" class="ad-popup-overlay">
+  <div class="ad-popup">
+    <h2>Ad Blocker Recommended</h2>
+    <p>Compassplate depends on an external API to fetch and feed custom movies to you with faster speeds than normal. Unfortunately, the external API injects click ads, so whenever you click anywhere on the page whilst watching content, it'll redirect you to a scam/adult website. I have linked an ad blocker below, it automatically detects what browser you're on and gets the extension for you, so you can easily download an ad blocker.</p>
+    <a id="adDownloadLink" class="ad-download-btn" target="_blank" rel="noopener noreferrer">Download Ad Blocker</a>
+    <button class="ad-dismiss" onclick="dismissAdPopup()">No thanks, I'll take my chances</button>
+  </div>
+</div>
     <button class="back">back</button>
 
     <div class="profile-section">
@@ -1239,5 +1322,51 @@
     };
     })();
     </script>
+<script>
+function detectBrowser() {
+  const ua = navigator.userAgent;
+  if (ua.includes('Firefox') && !ua.includes('Zen')) return { name: 'Firefox', url: 'https://addons.mozilla.org/en-US/firefox/addon/ghostery/' };
+  if (ua.includes('Edg')) return { name: 'Edge', url: 'https://microsoftedge.microsoft.com/addons/detail/adblock/gjcknafpcelkbgmaigkiikndpmbecjln' };
+  if (ua.includes('OPR') || ua.includes('Opera')) return { name: 'Opera', url: 'https://addons.opera.com/en/extensions/details/opera-ad-blocker/' };
+  if (ua.includes('Vivaldi')) return { name: 'Vivaldi', url: 'https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh' };
+  if (ua.includes('Thorium')) return { name: 'Thorium', url: 'https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh' };
+  if (ua.includes('Kiwi')) return { name: 'Kiwi', url: 'https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh' };
+  if (ua.includes('Arc')) return { name: 'Arc', url: 'https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh' };
+  if (ua.includes('Lemur')) return { name: 'Lemur', url: 'https://chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh' };
+  if (ua.includes('Zen')) return { name: 'Zen', url: 'https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/' };
+  if (ua.includes('Orion')) return { name: 'Orion', url: 'https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/' };
+  return { name: 'Chrome', url: 'https://chromewebstore.google.com/detail/pie-adblock-a-powerful-fr/jpkfgepcmmchgfbjblnodjhldacghenp' };
+}
+
+function showAdPopup() {
+  const browser = detectBrowser();
+  const link = document.getElementById('adDownloadLink');
+  link.textContent = 'Download Ad Blocker for ' + browser.name;
+  link.href = browser.url;
+  document.getElementById('adPopup').style.display = 'flex';
+}
+
+function dismissAdPopup() {
+  document.getElementById('adPopup').style.display = 'none';
+}
+
+async function detectAdBlocker() {
+  const bait = document.createElement('div');
+  bait.className = 'adsbox';
+  bait.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px';
+  document.body.appendChild(bait);
+  await new Promise(r => requestAnimationFrame(r));
+  const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
+  document.body.removeChild(bait);
+  return blocked;
+}
+
+(async () => {
+  const hasAdBlocker = await detectAdBlocker();
+  if (!hasAdBlocker) {
+    setTimeout(showAdPopup, 3000);
+  }
+})();
+</script>
 </body>
 </html>
