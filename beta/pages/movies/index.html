@@ -3435,25 +3435,27 @@ function dismissAdPopup() {
 }
 
 async function detectAdBlocker() {
+  try {
+    const res = await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
+  } catch {
+    return true;
+  }
   const bait = document.createElement('div');
-  bait.className = 'adsbox';
+  bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links';
   bait.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px';
   document.body.appendChild(bait);
   await new Promise(r => setTimeout(r, 500));
   const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
   document.body.removeChild(bait);
-  if (blocked) return true;
-  try {
-    const res = await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
-    return false;
-  } catch {
-    return true;
-  }
+  return blocked;
 }
 
 (async () => {
   const hasAdBlocker = await detectAdBlocker();
-  if (!hasAdBlocker) {
+  if (hasAdBlocker) {
+    const el = document.getElementById('adPopup');
+    if (el) el.remove();
+  } else {
     setTimeout(showAdPopup, 3000);
   }
 })();
