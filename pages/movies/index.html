@@ -1358,10 +1358,16 @@ async function detectAdBlocker() {
   bait.className = 'adsbox';
   bait.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px';
   document.body.appendChild(bait);
-  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => setTimeout(r, 500));
   const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
   document.body.removeChild(bait);
-  return blocked;
+  if (blocked) return true;
+  try {
+    const res = await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 (async () => {
