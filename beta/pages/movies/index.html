@@ -1774,6 +1774,7 @@ body {
     <button class="nav-tab active" data-tab="home">Home</button>
     <button class="nav-tab" data-tab="movies">Movies</button>
     <button class="nav-tab" data-tab="tv">TV Shows</button>
+    <button class="nav-tab" onclick="window.location.href='/beta/pages/tv/'">TV</button>
     <button class="nav-tab" data-tab="settings">Settings</button>
   </div>
 
@@ -2261,8 +2262,13 @@ async function initSupabase() {
 }
 
 document.querySelectorAll('.nav-tab').forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tab) switchTab(btn.dataset.tab);
+  });
 });
+
+const urlTab = new URLSearchParams(location.search).get('tab');
+if (urlTab) switchTab(urlTab);
 
 function switchTab(tab) {
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
@@ -3365,7 +3371,7 @@ function playMovie(id, title, watchMeta = {}) {
   activeWatch = { ...watchItem };
   addHistory(watchItem);
   const startAt = pos > 0 ? `&startAt=${pos}` : '';
-  const url = `https://vidfast.me/movie/${id}?autoPlay=true${startAt}`;
+  const url = `https://vidfast.vc/movie/${id}?autoPlay=true${startAt}`;
   openPlayer(url, title);
 }
 
@@ -3383,7 +3389,7 @@ function playTv(id, season, episode, title, watchMeta = {}) {
   activeWatch = { ...watchItem };
   addHistory(watchItem);
   const startAt = pos > 0 ? `&startAt=${pos}` : '';
-  const url = `https://vidfast.me/tv/${id}/${s}/${ep}?autoPlay=true${startAt}`;
+  const url = `https://vidfast.vc/tv/${id}/${s}/${ep}?autoPlay=true${startAt}`;
   openPlayer(url, title);
 }
 
