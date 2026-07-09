@@ -1305,7 +1305,7 @@
     };
 
     window.playTvShow = function(tvShowId, seasonNumber, episodeNumber) {
-        const vidFastUrl = `https://vidsrc.to/embed/tv/${tvShowId}?season=${seasonNumber}&episode=${episodeNumber}`;
+        const vidFastUrl = `https://vidsrc.to/embed/tv/${tvShowId}/${seasonNumber}/${episodeNumber}`;
         videoFrame.src = vidFastUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
