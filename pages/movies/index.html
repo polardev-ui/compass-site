@@ -1294,7 +1294,7 @@
     };
 
     window.playMovie = function(movieId) {
-        const vidFastUrl = `https://vidsrc.to/embed/${movieId}?autoPlay=true`;
+        const vidFastUrl = `https://vidsrc.to/embed/movie/${movieId}?autoPlay=true`;
         videoFrame.src = vidFastUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
