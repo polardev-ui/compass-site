@@ -1,5 +1,35 @@
 {
-  "buildCommand": "echo 'No build needed for static + serverless functions'",
-  "installCommand": "echo 'No dependencies to install'",
-  "outputDirectory": "."
+  "version": 2,
+  "cleanUrls": true,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "**/*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "!(api/**|package.json)",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/server.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
