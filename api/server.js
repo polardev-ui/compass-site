@@ -6,14 +6,18 @@ const url = require('url');
 const scramjet = require('./scramjet');
 
 function loadEnv() {
+  if (typeof process !== 'undefined' && process.env && Object.keys(process.env).length > 0) {
+    return process.env;
+  }
+
   const envPath = path.join(__dirname, '.env');
   const env = {};
-  
+
   try {
     if (fs.existsSync(envPath)) {
       const content = fs.readFileSync(envPath, 'utf-8');
       const lines = content.split('\n');
-      
+
       lines.forEach(line => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
@@ -26,7 +30,7 @@ function loadEnv() {
   } catch (err) {
     console.warn('Warning: Could not read .env file:', err.message);
   }
-  
+
   return env;
 }
 
