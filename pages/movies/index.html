@@ -1294,8 +1294,8 @@
     };
 
     window.playMovie = function(movieId) {
-        const vidFastUrl = `https://vidcore.org/embed/movie/${movieId}?autoPlay=true`;
-        videoFrame.src = vidFastUrl;
+        const vidSuperUrl = `https://vidsuper.net/movie/${movieId}`;
+        videoFrame.src = vidSuperUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
 
@@ -1305,8 +1305,8 @@
     };
 
     window.playTvShow = function(tvShowId, seasonNumber, episodeNumber) {
-        const vidFastUrl = `https://vidcore.org/embed/tv/${tvShowId}/${seasonNumber}/${episodeNumber}?autoPlay=true`;
-        videoFrame.src = vidFastUrl;
+        const vidSuperUrl = `https://vidsuper.net/tv/${tvShowId}/${seasonNumber}/${episodeNumber}`;
+        videoFrame.src = vidSuperUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
 

@@ -3370,8 +3370,7 @@ function playMovie(id, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const startAt = pos > 0 ? `&startAt=${pos}` : '';
-  const url = `https://vidfast.vc/movie/${id}?autoPlay=true${startAt}`;
+  const url = `https://vidsuper.net/movie/${id}`;
   openPlayer(url, title);
 }
 
@@ -3388,8 +3387,7 @@ function playTv(id, season, episode, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const startAt = pos > 0 ? `&startAt=${pos}` : '';
-  const url = `https://vidfast.vc/tv/${id}/${s}/${ep}?autoPlay=true${startAt}`;
+  const url = `https://vidsuper.net/tv/${id}/${s}/${ep}`;
   openPlayer(url, title);
 }
 
