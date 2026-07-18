@@ -3370,7 +3370,7 @@ function playMovie(id, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://vidsuper.net/movie/${id}`;
+  const url = `https://cinesrc.st/embed/movie/${id}`;
   openPlayer(url, title);
 }
 
@@ -3387,7 +3387,7 @@ function playTv(id, season, episode, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://vidsuper.net/tv/${id}/${s}/${ep}`;
+  const url = `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${ep}`;
   openPlayer(url, title);
 }
 

@@ -1294,7 +1294,7 @@
     };
 
     window.playMovie = function(movieId) {
-        const vidSuperUrl = `https://vidsuper.net/movie/${movieId}`;
+        const vidSuperUrl = `https://cinesrc.st/embed/movie/${movieId}`;
         videoFrame.src = vidSuperUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
@@ -1305,7 +1305,7 @@
     };
 
     window.playTvShow = function(tvShowId, seasonNumber, episodeNumber) {
-        const vidSuperUrl = `https://vidsuper.net/tv/${tvShowId}/${seasonNumber}/${episodeNumber}`;
+        const vidSuperUrl = `https://cinesrc.st/embed/tv/${tvShowId}?s=${seasonNumber}&e=${episodeNumber}`;
         videoFrame.src = vidSuperUrl;
         playerScreen.classList.add('active');
         movieModal.classList.remove('active');
