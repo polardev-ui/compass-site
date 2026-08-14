@@ -3370,7 +3370,7 @@ function playMovie(id, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://cinesrc.st/embed/movie/${id}`;
+  const url = `https://anyembed.xyz/embed/tmdb-movie-${id}`;
   openPlayer(url, title);
 }
 
@@ -3387,7 +3387,7 @@ function playTv(id, season, episode, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${ep}`;
+  const url = `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${ep}`;
   openPlayer(url, title);
 }
 
