@@ -3370,7 +3370,7 @@ function playMovie(id, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://anyembed.xyz/embed/tmdb-movie-${id}`;
+  const url = `https://vidfast.vc/movie/${id}`;
   openPlayer(url, title);
 }
 
@@ -3387,7 +3387,7 @@ function playTv(id, season, episode, title, watchMeta = {}) {
   };
   activeWatch = { ...watchItem };
   addHistory(watchItem);
-  const url = `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${ep}`;
+  const url = `https://vidfast.vc/tv/${id}/${s}/${ep}`;
   openPlayer(url, title);
 }
 
