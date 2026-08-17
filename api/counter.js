@@ -2,7 +2,7 @@ import { head, put } from '@vercel/blob';
 
 export default async function handler(req, res) {
   const filename = 'counter.json';
-  const fallbackCount = 4832;
+  const fallbackCount = 19215827;
 
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
