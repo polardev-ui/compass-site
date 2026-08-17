@@ -62,8 +62,43 @@ function handleAPIRequest(req, res) {
   }
 
   if (pathname === '/api/counter' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ count: parseInt(env.COUNTER_BASE || '4832', 10) }));
+    (async () => {
+      const fallbackCount = 19215827;
+
+      try {
+        const { head, put } = await import('@vercel/blob');
+        let currentCount = fallbackCount;
+
+        try {
+          const fileMeta = await head('counter.json');
+
+          if (fileMeta && fileMeta.url) {
+            const blobResponse = await fetch(`${fileMeta.url}?t=${Date.now()}`);
+            const json = await blobResponse.json();
+
+            if (json && typeof json.count === 'number') {
+              currentCount = json.count;
+            }
+          }
+        } catch (blobError) {
+          console.log('Blob file missing. Initializing baseline history count.');
+        }
+
+        const newCount = currentCount + 1;
+
+        await put('counter.json', JSON.stringify({ count: newCount }), {
+          access: 'public',
+          addRandomSuffix: false,
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ count: newCount }));
+      } catch (error) {
+        console.error('Fatal Counter Error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ count: fallbackCount }));
+      }
+    })();
     return true;
   }
 
