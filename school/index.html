@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>compassplate - school</title>
+  <link rel="icon" type="image/gif" href="compass-school.gif">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+      background-color: black;
+      color: white;
+      overflow: hidden;
+    }
+
+    img {
+      width: 170px;
+      height: 170px;
+    }
+
+    h1 {
+      margin-top: 20px;
+    }
+
+    input {
+      background: 0;
+      border: 0;
+      outline: none;
+      width: 100%;
+      font-size: 1.5em;
+      transition: padding 0.3s 0.2s ease;
+      color: white;
+    }
+
+    input:focus {
+      padding-bottom: 5px;
+    }
+
+    input:focus + .line:after {
+      transform: scaleX(1);
+    }
+
+    .field {
+      position: relative;
+      width: 80vw;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .field .line {
+      width: 100%;
+      height: 3px;
+      position: absolute;
+      bottom: -8px;
+      background: #bdc3c7;
+    }
+
+    .field .line:after {
+        content: " ";
+        position: absolute;
+        width: 100%;
+        height: 3px;
+        left: 0;
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 0.3s ease;
+        background: red;
+        z-index: 1;
+    }
+
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      z-index: 10;
+      top: 0;
+      left: 0;
+      background-color: #111;
+      overflow-x: hidden;
+      padding-top: 60px;
+      transition: 0.5s;
+    }
+
+    .sidebar a {
+      padding: 8px 8px 8px 32px;
+      text-decoration: none;
+      font-size: 25px;
+      color: #818181;
+      display: block;
+      transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+      color: #f1f1f1;
+    }
+
+    .sidebar .closebtn {
+      position: absolute;
+      top: 10px;
+      right: 25px;
+      font-size: 36px;
+    }
+
+    .openbtn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 24px;
+      cursor: pointer;
+      background: none;
+      color: white;
+      border: none;
+      padding: 10px;
+      z-index: 5;
+    }
+
+    .openbtn:hover {
+      color: #444;
+    }
+
+    #main {
+      transition: margin-left .5s;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    @media screen and (max-height: 450px) {
+      .sidebar { padding-top: 15px; }
+      .sidebar a { font-size: 18px; }
+    }
+
+    .sidebar-logo {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 20px;
+        margin-left: 27px;
+    }
+
+    .counter-container {
+        margin-top: 35px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transform: translateY(10px);
+        animation: fadeInUp 0.8s 0.5s forwards ease-out;
+      }
+
+      .counter-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #818181;
+      }
+
+      .counter-slots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .digit-slot {
+        width: 24px;
+        height: 36px;
+        background-color: #111;
+        border: 1px solid #222;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+
+      .digit-strip {
+        position: absolute;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      .digit-number {
+        width: 24px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25em;
+        font-weight: bold;
+        color: #fff;
+      }
+
+      @keyframes fadeInUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+  </style>
+  <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
+</head>
+<body>
+
+  <div id="mySidebar" class="sidebar">
+    <img src="compass-school.gif" alt="logo" class="sidebar-logo">
+
+    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+    <a href="pages/about">About</a>
+    <a href="pages/credits">Credits</a>
+    <a href="pages/socials">Socials</a>
+    <a href="pages/ai">AI Chat</a>
+  </div>
+
+  <button class="openbtn" onclick="openNav()">&#9776;</button>
+
+  <div id="main">
+    <img src="compass-school.gif" alt="compass">
+    <h1></h1>
+    <div class="field">
+      <input class="search" type="text" placeholder="search...">
+      <div class="line"></div>
+    </div>
+    <div class="counter-container">
+      <div class="counter-slots" id="counter">
+        <div class="digit-slot"><div class="digit-strip" id="slot-0"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-1"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-2"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-3"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-4"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-5"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-6"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-7"></div></div>
+        <div class="digit-slot"><div class="digit-strip" id="slot-8"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.querySelector('.search');
+
+    searchInput.addEventListener('keypress', function(event) {
+      if (event.key === 'Enter') {
+        const query = searchInput.value.trim();
+        if (query) {
+          window.location.href = `/pages/movies/?q=${encodeURIComponent(query)}`;
+        }
+      }
+    });
+
+    function openNav() {
+      document.getElementById("mySidebar").style.width = "250px";
+    }
+
+    function closeNav() {
+      document.getElementById("mySidebar").style.width = "0";
+    }
+
+    const totalSlots = 9;
+    const heightPerDigit = 36;
+
+    function initCounter() {
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        for (let j = 0; j <= 9; j++) {
+          const div = document.createElement('div');
+          div.className = 'digit-number';
+          div.innerText = j;
+          strip.appendChild(div);
+        }
+      }
+    }
+
+    function updateCounterDisplay(count) {
+      const countString = String(count).padStart(totalSlots, '0');
+      for (let i = 0; i < totalSlots; i++) {
+        const strip = document.getElementById(`slot-${i}`);
+        if (!strip) continue;
+        const digit = parseInt(countString[i]);
+        strip.style.transform = `translateY(-${digit * heightPerDigit}px)`;
+      }
+    }
+
+    initCounter();
+
+    async function fetchLiveCounter() {
+      try {
+        const response = await fetch('/api/counter');
+        if (!response.ok) throw new Error('Network issue');
+
+        const data = await response.json();
+        updateCounterDisplay(data.count);
+      } catch (error) {
+        console.error('Could not fetch live counter data:', error);
+        updateCounterDisplay(1234);
+      }
+    }
+
+    fetchLiveCounter();
+  </script>
+</body>
+</html>
