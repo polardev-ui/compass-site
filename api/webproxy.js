@@ -127,12 +127,33 @@ function rewriteSetCookie(values) {
   );
 }
 
+// zstd only exists on newer Node; anything not listed here must never be
+// requested upstream, or we would serve compressed bytes as text.
+const DECODABLE = ['gzip', 'deflate', 'br']
+  .concat(typeof zlib.zstdDecompressSync === 'function' ? ['zstd'] : []);
+
 function decompress(buffer, encoding) {
   const enc = (encoding || '').toLowerCase();
+  if (!enc || enc === 'identity') return buffer;
+  if (enc.includes('zstd')) {
+    if (typeof zlib.zstdDecompressSync !== 'function') throw new Error('zstd unsupported');
+    return zlib.zstdDecompressSync(buffer);
+  }
   if (enc.includes('br')) return zlib.brotliDecompressSync(buffer);
   if (enc.includes('gzip')) return zlib.gunzipSync(buffer);
   if (enc.includes('deflate')) return zlib.inflateSync(buffer);
-  return buffer;
+  throw new Error('unknown content-encoding: ' + enc);
+}
+
+// Chrome advertises zstd. Forwarding that verbatim made origins reply with an
+// encoding we could not decode, and the raw bytes were served as HTML.
+function upstreamAcceptEncoding(clientValue) {
+  if (!clientValue) return DECODABLE.join(', ');
+  const kept = String(clientValue)
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => DECODABLE.includes(part.split(';')[0].trim().toLowerCase()));
+  return kept.length ? kept.join(', ') : DECODABLE.join(', ');
 }
 
 /**
@@ -393,7 +414,7 @@ function handleProxy(req, res, requestUrl) {
   headers['host'] = target.host;
   // Non-HTML bodies stream through still compressed, so only ask upstream for
   // encodings this client actually announced it can decode.
-  headers['accept-encoding'] = req.headers['accept-encoding'] || 'gzip, deflate';
+  headers['accept-encoding'] = upstreamAcceptEncoding(req.headers['accept-encoding']);
 
   // Referer/Origin must describe the target site, not our proxy host, or the
   // target rejects the request as cross-site.
@@ -473,11 +494,21 @@ function handleProxy(req, res, requestUrl) {
       });
 
       upstreamRes.on('end', () => {
+        const raw = Buffer.concat(chunks);
         let body;
         try {
-          body = decompress(Buffer.concat(chunks), upstreamRes.headers['content-encoding']).toString('utf8');
+          body = decompress(raw, upstreamRes.headers['content-encoding']).toString('utf8');
         } catch (err) {
-          body = Buffer.concat(chunks).toString('utf8');
+          // Decoding failed, so the bytes are not text we can rewrite. Hand them
+          // back compressed and let the browser decode, rather than rendering
+          // the compressed stream as characters.
+          const passthrough = Object.assign({}, outHeaders);
+          if (upstreamRes.headers['content-encoding']) {
+            passthrough['content-encoding'] = upstreamRes.headers['content-encoding'];
+          }
+          res.writeHead(status, passthrough);
+          res.end(raw);
+          return;
         }
 
         const rewritten = isCss
