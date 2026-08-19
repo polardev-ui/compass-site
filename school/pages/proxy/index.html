@@ -297,18 +297,34 @@
       wrap.classList.remove('visible');
     }
 
-    function injectBaseHref(content, origin) {
+    function rewriteRootRelativeUrls(content, origin) {
       if (!origin) return content;
-      const baseTag = `<base href="${origin}/">`;
-      if (/<base\b/i.test(content)) return content;
-      if (/<head\b[^>]*>/i.test(content)) {
-        return content.replace(/<head\b[^>]*>/i, match => `${match}${baseTag}`);
+
+      const rewriteUrl = (url) => {
+        if (!url || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(url)) return url;
+        if (/^https?:\/\//i.test(url) || url.startsWith('//')) return url;
+        if (url.startsWith('/')) return origin + url;
+        return url;
+      };
+
+      const attrPattern = /(href|src|action|poster|data|content)=(["'])([^"']+)\2/gi;
+      content = content.replace(attrPattern, (match, attr, quote, url) => `${attr}=${quote}${rewriteUrl(url)}${quote}`);
+      content = content.replace(/url\((['"]?)(\/[^)"']+)\1\)/gi, (match, quote, url) => `url(${quote}${origin}${url}${quote})`);
+
+      if (!/<base\b/i.test(content)) {
+        const baseTag = `<base href="${origin}/">`;
+        if (/<head\b[^>]*>/i.test(content)) {
+          content = content.replace(/<head\b[^>]*>/i, match => `${match}${baseTag}`);
+        } else {
+          content = `<!DOCTYPE html><html><head>${baseTag}</head><body>${content}</body></html>`;
+        }
       }
-      return `<!DOCTYPE html><html><head>${baseTag}</head><body>${content}</body></html>`;
+
+      return content;
     }
 
     function renderHtml(content) {
-      frame.srcdoc = injectBaseHref(content, currentTargetOrigin);
+      frame.srcdoc = rewriteRootRelativeUrls(content, currentTargetOrigin);
       frame.style.display = 'block';
       empty.style.display = 'none';
     }
