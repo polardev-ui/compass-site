@@ -207,6 +207,28 @@ function clientShim(origin) {
     };
   }
 
+  // A nested registration would claim a scope deeper than ours
+  // (/api/p/<origin>/ beats /api/p/), so the site's own worker would win and
+  // route requests it cannot understand. YouTube does this, and the result is a
+  // reload loop. Keep the promise unsettled rather than rejecting, since a
+  // rejection triggers unhandled-rejection paths in some apps.
+  if (navigator.serviceWorker) {
+    try {
+      Object.defineProperty(navigator.serviceWorker, 'register', {
+        configurable: true,
+        value: function(){ return new Promise(function(){}); }
+      });
+      Object.defineProperty(navigator.serviceWorker, 'getRegistration', {
+        configurable: true,
+        value: function(){ return Promise.resolve(undefined); }
+      });
+      Object.defineProperty(navigator.serviceWorker, 'getRegistrations', {
+        configurable: true,
+        value: function(){ return Promise.resolve([]); }
+      });
+    } catch (e) {}
+  }
+
   var setAttr = Element.prototype.setAttribute;
   var URL_ATTRS = { src: 1, href: 1, action: 1, poster: 1 };
   Element.prototype.setAttribute = function(name, value){
@@ -523,9 +545,19 @@ self.addEventListener('fetch', event => {
     const url = new URL(request.url);
     const sameOrigin = url.origin === self.location.origin;
 
+    // A rejected promise here makes respondWith produce a network error. On a
+    // navigation that blanks the page and the site's shell retries, which shows
+    // up as a reload loop, so every fetch below is guarded.
+    function fail(e) {
+      return new Response('Proxy fetch failed: ' + (e && e.message), {
+        status: 502,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+
     // Already addressed to the proxy: let it through untouched.
     if (sameOrigin && url.pathname.startsWith(PREFIX)) {
-      return fetch(request);
+      return fetch(request).catch(fail);
     }
 
     let base = null;
@@ -542,7 +574,7 @@ self.addEventListener('fetch', event => {
     // Root-relative URL that escaped the prefix: re-anchor it on the real site.
     let target;
     if (sameOrigin) {
-      if (!base) return fetch(request);
+      if (!base) return fetch(request).catch(fail);
       target = base + url.pathname + url.search;
     } else {
       target = request.url;
@@ -565,7 +597,7 @@ self.addEventListener('fetch', event => {
     try {
       return await fetch(new Request(proxied, init));
     } catch (e) {
-      return new Response('Proxy fetch failed: ' + e.message, { status: 502 });
+      return fail(e);
     }
   })());
 });

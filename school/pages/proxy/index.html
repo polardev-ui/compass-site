@@ -386,6 +386,7 @@
     // and pull it back onto the site it was really trying to reach.
     let currentOrigin = null;
     let lastRecovery = 0;
+    let recoveryTimes = [];
 
     function syncAddressBar() {
       if (frame.style.display === 'none') return;
@@ -399,12 +400,21 @@
 
       if (!inner.pathname.startsWith(PROXY_PREFIX)) {
         const now = Date.now();
-        if (currentOrigin && inner.origin === location.origin && now - lastRecovery > 1500) {
-          lastRecovery = now;
-          frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
-        }
+        if (!currentOrigin || inner.origin !== location.origin) return;
+        if (now - lastRecovery <= 1500) return;
+
+        // A site that escapes on every load would otherwise be recovered
+        // forever, which the user sees as a page reloading every ~2s.
+        recoveryTimes = recoveryTimes.filter(t => now - t < 10000);
+        if (recoveryTimes.length >= 3) { recoveryTimes = []; return; }
+        recoveryTimes.push(now);
+
+        lastRecovery = now;
+        frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
         return;
       }
+
+      recoveryTimes = [];
 
       const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
       if (real) {

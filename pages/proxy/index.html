@@ -273,9 +273,17 @@
     const reloadBtn = document.getElementById('reloadBtn');
     const proxyContent = document.getElementById('proxyContent');
 
-    let urlHistory = [];
-    let currentHistoryIndex = -1;
+    // Session history lives here rather than in the iframe: the DOM exposes no
+    // way to ask an iframe whether it can go back, so the buttons could never
+    // be enabled correctly from frame.history alone.
+    let entries = [];          // real URLs, oldest first
+    let index = -1;            // position within entries
     let frame = null;
+    let pendingNav = false;    // a navigation we started is in flight
+    let urlDirty = false;      // user is editing the address bar
+    let currentOrigin = null;
+    let lastRecovery = 0;
+    let recoveryTimes = [];   // escape-recovery attempts, for loop detection
 
     function encodeOrigin(origin) {
         return btoa(origin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -302,19 +310,6 @@
         return PROXY_PREFIX + encodeOrigin(u.origin) + u.pathname + u.search + u.hash;
     }
 
-    // Unwraps a proxy path back to the real URL, however many layers deep.
-    function unwrap(url) {
-        for (let i = 0; i < 5; i++) {
-            let u;
-            try { u = new URL(url); } catch (err) { return url; }
-            if (!isProxyPath(u.pathname)) return url;
-            const real = fromProxyPath(u.pathname + u.search + u.hash);
-            if (!real || real === url) return url;
-            url = real;
-        }
-        return url;
-    }
-
     function fromProxyPath(pathWithQuery) {
         if (!pathWithQuery.startsWith(PROXY_PREFIX)) return null;
         const rest = pathWithQuery.slice(PROXY_PREFIX.length);
@@ -326,6 +321,19 @@
         } catch (err) {
             return null;
         }
+    }
+
+    // Unwraps a proxy path back to the real URL, however many layers deep.
+    function unwrap(url) {
+        for (let i = 0; i < 5; i++) {
+            let u;
+            try { u = new URL(url); } catch (err) { return url; }
+            if (!isProxyPath(u.pathname)) return url;
+            const real = fromProxyPath(u.pathname + u.search + u.hash);
+            if (!real || real === url) return url;
+            url = real;
+        }
+        return url;
     }
 
     // The service worker is scoped to /api/p/ so it only intercepts requests
@@ -367,16 +375,122 @@
         frame = null;
     }
 
-    // The proxied document is same-origin, so its address can be read back and
-    // mirrored into the URL bar as the user clicks around inside the frame.
+    function setLoading(on) {
+        const existing = proxyContent.querySelector('.loading-overlay');
+        if (!on) {
+            if (existing) existing.remove();
+            return;
+        }
+        if (existing) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = '<div class="loading-spinner">⟳</div>';
+        proxyContent.appendChild(overlay);
+    }
+
+    // One long-lived iframe: recreating it per navigation threw away the
+    // in-frame session state and made every load a cold start.
+    function ensureFrame() {
+        if (frame && frame.isConnected) return frame;
+
+        proxyContent.innerHTML = '';
+        frame = document.createElement('iframe');
+        frame.className = 'proxy-frame';
+        frame.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+        frame.addEventListener('load', () => {
+            pendingNav = false;
+            setLoading(false);
+            syncAddressBar();
+        });
+        proxyContent.appendChild(frame);
+        return frame;
+    }
+
+    // The proxied document is same-origin, so its address can be read back.
+    function frameRealUrl() {
+        if (!frame) return null;
+        let inner;
+        try {
+            inner = frame.contentWindow.location;
+        } catch (err) {
+            return null; /* not readable yet */
+        }
+        if (!inner.pathname.startsWith(PROXY_PREFIX)) return null;
+        return fromProxyPath(inner.pathname + inner.search + inner.hash);
+    }
+
+    function setAddressBar(value) {
+        // Never clobber what the user is in the middle of typing.
+        if (document.activeElement === urlInput || urlDirty) return;
+        urlInput.value = value;
+    }
+
+    function updateNavButtons() {
+        navBackBtn.disabled = index <= 0;
+        navForwardBtn.disabled = index >= entries.length - 1;
+    }
+
+    function loadEntry(realUrl) {
+        let proxyPath;
+        try {
+            proxyPath = toProxyPath(realUrl);
+        } catch (err) {
+            showMessage('❌', 'Not a valid URL');
+            return;
+        }
+
+        try { currentOrigin = new URL(realUrl).origin; } catch (err) { /* keep previous */ }
+
+        pendingNav = true;
+        setAddressBar(realUrl);
+        ensureFrame();
+        setLoading(true);
+        frame.src = proxyPath;
+        updateNavButtons();
+    }
+
+    async function proxyUrl(rawUrl) {
+        let url = rawUrl.trim();
+        if (!url) return;
+        if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
+        url = unwrap(url);
+
+        urlDirty = false;
+        urlInput.blur();   // otherwise setAddressBar keeps deferring to the user
+        await ensureServiceWorker();
+
+        // A fresh navigation truncates anything ahead, like a real browser.
+        entries = entries.slice(0, index + 1);
+        entries.push(url);
+        index = entries.length - 1;
+
+        loadEntry(url);
+    }
+
+    function goBack() {
+        if (index <= 0) return;
+        index--;
+        loadEntry(entries[index]);
+    }
+
+    function goForward() {
+        if (index >= entries.length - 1) return;
+        index++;
+        loadEntry(entries[index]);
+    }
+
+    function reloadCurrent() {
+        if (index < 0) return;
+        loadEntry(entries[index]);
+    }
+
+    // Records navigations that originate inside the frame (link clicks, form
+    // submits, SPA routing) so Back reaches them, and keeps the URL bar honest.
     //
     // Some sites assign to location directly (e.g. `location.href = '/'`).
     // `location` is unforgeable, so no in-page shim can catch that; the frame
     // lands on this origin instead and would render our 404. Detect that here
     // and pull it back onto the site it was really trying to reach.
-    let currentOrigin = null;
-    let lastRecovery = 0;
-
     function syncAddressBar() {
         if (!frame) return;
 
@@ -389,109 +503,63 @@
 
         if (!inner.pathname.startsWith(PROXY_PREFIX)) {
             const now = Date.now();
-            if (currentOrigin && inner.origin === location.origin && now - lastRecovery > 1500) {
-                lastRecovery = now;
-                frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
+            if (!currentOrigin || inner.origin !== location.origin) return;
+            if (now - lastRecovery <= 1500) return;
+
+            // A site that escapes on every load would otherwise be recovered
+            // forever, which the user sees as a page reloading every ~2s.
+            recoveryTimes = recoveryTimes.filter(t => now - t < 10000);
+            if (recoveryTimes.length >= 3) {
+                showMessage('⚠️', 'This site keeps navigating out of the proxy. Stopped reloading it.');
+                recoveryTimes = [];
+                return;
             }
+            recoveryTimes.push(now);
+
+            lastRecovery = now;
+            pendingNav = true;
+            frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
             return;
         }
+
+        recoveryTimes = [];
 
         const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
-        if (real) {
-            urlInput.value = real;
-            try { currentOrigin = new URL(real).origin; } catch (err) { /* keep previous */ }
+        if (!real) return;
+
+        setAddressBar(real);
+        try { currentOrigin = new URL(real).origin; } catch (err) { /* keep previous */ }
+
+        // While our own navigation is in flight the frame may still be showing
+        // the previous page; recording it would corrupt the stack.
+        if (pendingNav) return;
+
+        if (entries[index] !== real) {
+            entries = entries.slice(0, index + 1);
+            entries.push(real);
+            index = entries.length - 1;
+            updateNavButtons();
         }
     }
 
-    async function proxyUrl(url, { record = true } = {}) {
-        if (!url.match(/^https?:\/\//i)) {
-            url = 'https://' + url;
-        }
-        url = unwrap(url);
-
-        let proxyPath;
-        try {
-            proxyPath = toProxyPath(url);
-        } catch (err) {
-            showMessage('❌', 'Not a valid URL');
-            return;
-        }
-
-        urlInput.value = url;
-        try { currentOrigin = new URL(url).origin; } catch (err) { /* validated below */ }
-
-        proxyContent.innerHTML = '';
-        const loadingOverlay = document.createElement('div');
-        loadingOverlay.className = 'loading-overlay';
-        loadingOverlay.innerHTML = '<div class="loading-spinner">⟳</div>';
-
-        await ensureServiceWorker();
-
-        frame = document.createElement('iframe');
-        frame.className = 'proxy-frame';
-        frame.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-        frame.addEventListener('load', () => {
-            if (loadingOverlay.parentNode) loadingOverlay.remove();
-            syncAddressBar();
-        });
-
-        proxyContent.style.position = 'relative';
-        proxyContent.appendChild(frame);
-        proxyContent.appendChild(loadingOverlay);
-
-        frame.src = proxyPath;
-
-        if (record) {
-            urlHistory = urlHistory.slice(0, currentHistoryIndex + 1);
-            urlHistory.push(url);
-            currentHistoryIndex = urlHistory.length - 1;
-        }
-        updateNavButtons();
-    }
-
-    function updateNavButtons() {
-        navBackBtn.disabled = currentHistoryIndex <= 0;
-        navForwardBtn.disabled = currentHistoryIndex >= urlHistory.length - 1;
-    }
-
-    // Keep the URL bar honest while the user navigates inside the frame.
     setInterval(syncAddressBar, 700);
 
-    goBtn.addEventListener('click', () => {
-        const url = urlInput.value.trim();
-        if (url) proxyUrl(url);
-    });
+    urlInput.addEventListener('input', () => { urlDirty = true; });
 
-    urlInput.addEventListener('keypress', (e) => {
+    urlInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            const url = urlInput.value.trim();
-            if (url) proxyUrl(url);
+            proxyUrl(urlInput.value);
+        } else if (e.key === 'Escape') {
+            urlDirty = false;
+            if (index >= 0) urlInput.value = entries[index];
+            urlInput.blur();
         }
     });
 
-    navBackBtn.addEventListener('click', () => {
-        if (frame && frame.contentWindow && frame.contentWindow.history.length > 1) {
-            frame.contentWindow.history.back();
-            return;
-        }
-        if (currentHistoryIndex > 0) {
-            currentHistoryIndex--;
-            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
-        }
-    });
-
-    navForwardBtn.addEventListener('click', () => {
-        if (currentHistoryIndex < urlHistory.length - 1) {
-            currentHistoryIndex++;
-            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
-        }
-    });
-
-    reloadBtn.addEventListener('click', () => {
-        if (currentHistoryIndex >= 0) {
-            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
-        }
-    });
+    goBtn.addEventListener('click', () => proxyUrl(urlInput.value));
+    navBackBtn.addEventListener('click', goBack);
+    navForwardBtn.addEventListener('click', goForward);
+    reloadBtn.addEventListener('click', reloadCurrent);
 
     updateNavButtons();
     ensureServiceWorker();
