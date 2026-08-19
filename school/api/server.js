@@ -1,0 +1,319 @@
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
+const scramjet = require('./scramjet');
+
+function loadEnv() {
+  if (typeof process !== 'undefined' && process.env && Object.keys(process.env).length > 0) {
+    return process.env;
+  }
+
+  const envPath = path.join(__dirname, '.env');
+  const env = {};
+
+  try {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      const lines = content.split('\n');
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+          env[key.trim()] = value;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Warning: Could not read .env file:', err.message);
+  }
+
+  return env;
+}
+
+const env = loadEnv();
+
+function getPublicConfig() {
+  return {
+    SUPABASE_URL: env.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY || '',
+    TMDB_API_KEY: env.TMDB_API_KEY || '',
+    SPOTIFY_CLIENT_ID: env.SPOTIFY_CLIENT_ID || '',
+    FIREBASE_API_KEY: env.FIREBASE_API_KEY || '',
+    FIREBASE_AUTH_DOMAIN: env.FIREBASE_AUTH_DOMAIN || '',
+    FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID || '',
+    FIREBASE_STORAGE_BUCKET: env.FIREBASE_STORAGE_BUCKET || '',
+    FIREBASE_MESSAGING_SENDER_ID: env.FIREBASE_MESSAGING_SENDER_ID || '',
+    FIREBASE_APP_ID: env.FIREBASE_APP_ID || '',
+    FIREBASE_MEASUREMENT_ID: env.FIREBASE_MEASUREMENT_ID || ''
+  };
+}
+
+function isBotUA(userAgent = '') {
+  const botPatterns = [
+    /bot/i, /crawler/i, /spider/i, /scraper/i, /curl/i, /wget/i,
+    /python/i, /java(?!script)/i, /googlebot/i, /bingbot/i,
+    /yandexbot/i, /slurp/i, /duckduckbot/i, /baiduspider/i,
+    /nutch/i, /mediapartners/i, /teoma/i, /gigablast/i
+  ];
+  return botPatterns.some(pattern => pattern.test(userAgent));
+}
+
+function handleAPIRequest(req, res) {
+  const urlObj = new url.URL(req.url, `http://${req.headers.host}`);
+  const pathname = urlObj.pathname;
+
+  if (pathname === '/api/config' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getPublicConfig()));
+    return true;
+  }
+
+  if (pathname === '/api/counter' && req.method === 'GET') {
+    (async () => {
+      const fallbackCount = 19215827;
+
+      try {
+        const { head, put } = await import('@vercel/blob');
+        let currentCount = fallbackCount;
+
+        try {
+          const fileMeta = await head('counter.json');
+
+          if (fileMeta && fileMeta.url) {
+            const blobResponse = await fetch(`${fileMeta.url}?t=${Date.now()}`);
+            const json = await blobResponse.json();
+
+            if (json && typeof json.count === 'number') {
+              currentCount = json.count;
+            }
+          }
+        } catch (blobError) {
+          console.log('Blob file missing. Initializing baseline history count.');
+        }
+
+        const newCount = currentCount + 1;
+
+        await put('counter.json', JSON.stringify({ count: newCount }), {
+          access: 'public',
+          addRandomSuffix: false,
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ count: newCount }));
+      } catch (error) {
+        console.error('Fatal Counter Error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ count: fallbackCount }));
+      }
+    })();
+    return true;
+  }
+
+  if (pathname === '/api/ai-chat' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+      if (body.length > 1024 * 100) {
+        res.writeHead(413);
+        res.end('Payload too large');
+      }
+    });
+
+    req.on('end', async () => {
+      try {
+        const { model, messages } = JSON.parse(body);
+        const apiKey = env.AI_API_KEY;
+        if (!apiKey) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'AI service not configured' }));
+          return;
+        }
+
+        const response = await fetch('https://api.wsgpolar.me/v1/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ model, messages })
+        });
+        const data = await response.json();
+        res.writeHead(response.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message || 'AI request failed' }));
+      }
+    });
+    return true;
+  }
+
+  if (pathname === '/api/scramjet/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(scramjet.getStatus()));
+    return true;
+  }
+
+  if (pathname === '/api/scramjet/test') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(scramjet.test()));
+    return true;
+  }
+
+  if (pathname === '/api/verify-user') {
+    const userAgent = req.headers['user-agent'] || '';
+    const acceptLanguage = req.headers['accept-language'] || '';
+    const isBot = isBotUA(userAgent);
+
+    if (isBot || !acceptLanguage) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'User verification failed' }));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ verified: true, user_type: 'human' }));
+    }
+    return true;
+  }
+
+  if (pathname === '/api/proxy' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+      if (body.length > 1024 * 100) {
+        res.writeHead(413);
+        res.end('Payload too large');
+      }
+    });
+
+    req.on('end', async () => {
+      try {
+        const data = JSON.parse(body);
+        const targetURL = data.url;
+
+        if (!targetURL || !targetURL.match(/^https?:\/\//)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid URL' }));
+          return;
+        }
+
+        const blockedDomains = [
+          'facebook.com', 'instagram.com', 'tiktok.com',
+          'twitter.com', 'x.com', 'reddit.com'
+        ];
+        const urlHostname = new URL(targetURL).hostname;
+        if (blockedDomains.some(domain => urlHostname.includes(domain))) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Domain blocked for privacy' }));
+          return;
+        }
+
+        const proxyResult = await scramjet.proxy(targetURL);
+
+        if (proxyResult.error) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: proxyResult.error }));
+          return;
+        }
+
+        const isHTML = proxyResult.contentType?.includes('text/html');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          type: isHTML ? 'html' : 'text',
+          content: proxyResult.content,
+          status: 'success'
+        }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message || 'Proxy error' }));
+      }
+    });
+    return true;
+  }
+
+  return false;
+}
+
+console.log('Environment variables loaded:');
+Object.keys(env).forEach(key => {
+  console.log(`  ✓ ${key}`);
+});
+
+const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/')) {
+    if (handleAPIRequest(req, res)) {
+      return;
+    }
+  }
+
+  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  
+  if (!filePath.startsWith(__dirname)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+  
+  const ext = path.extname(filePath);
+  
+  try {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      let content = fs.readFileSync(filePath, 'utf-8');
+      
+      if (ext === '.html') {
+        const envScript = `
+<script>
+window.__env = ${JSON.stringify(env)};
+</script>
+`;
+        content = content.replace('</head>', envScript + '</head>');
+      }
+      
+      const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.svg': 'image/svg+xml',
+        '.wav': 'audio/wav',
+        '.mp4': 'video/mp4'
+      };
+      
+      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+      res.end(content);
+    } else if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+      const indexPath = path.join(filePath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        let content = fs.readFileSync(indexPath, 'utf-8');
+        const envScript = `
+<script>
+window.__env = ${JSON.stringify(env)};
+</script>
+`;
+        content = content.replace('</head>', envScript + '</head>');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(content);
+      } else {
+        res.writeHead(404);
+        res.end('Not found');
+      }
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  } catch (err) {
+    console.error('Error:', err);
+    res.writeHead(500);
+    res.end('Internal server error');
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {});
