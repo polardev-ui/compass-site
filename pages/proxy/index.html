@@ -247,7 +247,7 @@
             <button class="nav-btn" id="reloadBtn" title="Reload">⟳</button>
         </div>
         <div class="address-bar">
-            <input type="text" class="url-input" id="urlInput" placeholder="Enter URL to proxy...">
+            <input type="text" class="url-input" id="urlInput" placeholder="Search, or enter a URL...">
             <button class="go-btn" id="goBtn">GO</button>
         </div>
     </div>
@@ -265,6 +265,7 @@
 
     <script>
     const PROXY_PREFIX = '/api/p/';
+    const SEARCH_PATH = '/api/search';
 
     const urlInput = document.getElementById('urlInput');
     const goBtn = document.getElementById('goBtn');
@@ -274,16 +275,16 @@
     const proxyContent = document.getElementById('proxyContent');
 
     // Session history lives here rather than in the iframe: the DOM exposes no
-    // way to ask an iframe whether it can go back, so the buttons could never
-    // be enabled correctly from frame.history alone.
-    let entries = [];          // real URLs, oldest first
-    let index = -1;            // position within entries
+    // way to ask an iframe whether it can go back. Each entry is the path we
+    // load into the frame plus what the address bar should show for it.
+    let entries = [];          // [{ path, display }]
+    let index = -1;
     let frame = null;
     let pendingNav = false;    // a navigation we started is in flight
     let urlDirty = false;      // user is editing the address bar
     let currentOrigin = null;
     let lastRecovery = 0;
-    let recoveryTimes = [];   // escape-recovery attempts, for loop detection
+    let recoveryTimes = [];
 
     function encodeOrigin(origin) {
         return btoa(origin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -334,6 +335,19 @@
             url = real;
         }
         return url;
+    }
+
+    // Anything that is not plausibly an address is treated as a search, the way
+    // a browser's omnibox does.
+    function looksLikeUrl(text) {
+        if (/^https?:\/\//i.test(text)) return true;
+        if (/\s/.test(text)) return false;
+        const host = text.split(/[\/?#]/)[0];
+        return /^[a-z0-9-]+(\.[a-z0-9-]+)+\.?(:\d+)?$/i.test(host) || /^localhost(:\d+)?$/i.test(host);
+    }
+
+    function searchEntry(query) {
+        return { path: SEARCH_PATH + '?q=' + encodeURIComponent(query), display: query };
     }
 
     // The service worker is scoped to /api/p/ so it only intercepts requests
@@ -406,19 +420,6 @@
         return frame;
     }
 
-    // The proxied document is same-origin, so its address can be read back.
-    function frameRealUrl() {
-        if (!frame) return null;
-        let inner;
-        try {
-            inner = frame.contentWindow.location;
-        } catch (err) {
-            return null; /* not readable yet */
-        }
-        if (!inner.pathname.startsWith(PROXY_PREFIX)) return null;
-        return fromProxyPath(inner.pathname + inner.search + inner.hash);
-    }
-
     function setAddressBar(value) {
         // Never clobber what the user is in the middle of typing.
         if (document.activeElement === urlInput || urlDirty) return;
@@ -430,41 +431,56 @@
         navForwardBtn.disabled = index >= entries.length - 1;
     }
 
-    function loadEntry(realUrl) {
-        let proxyPath;
-        try {
-            proxyPath = toProxyPath(realUrl);
-        } catch (err) {
-            showMessage('❌', 'Not a valid URL');
-            return;
+    function loadEntry(entry) {
+        if (!entry) return;
+
+        if (entry.display && /^https?:\/\//i.test(entry.display)) {
+            try { currentOrigin = new URL(entry.display).origin; } catch (err) { /* keep previous */ }
         }
 
-        try { currentOrigin = new URL(realUrl).origin; } catch (err) { /* keep previous */ }
-
         pendingNav = true;
-        setAddressBar(realUrl);
+        setAddressBar(entry.display);
         ensureFrame();
         setLoading(true);
-        frame.src = proxyPath;
+        frame.src = entry.path;
         updateNavButtons();
     }
 
-    async function proxyUrl(rawUrl) {
-        let url = rawUrl.trim();
-        if (!url) return;
-        if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
-        url = unwrap(url);
+    function pushEntry(entry) {
+        // A fresh navigation truncates anything ahead, like a real browser.
+        entries = entries.slice(0, index + 1);
+        entries.push(entry);
+        index = entries.length - 1;
+    }
+
+    async function proxyUrl(rawInput) {
+        const text = rawInput.trim();
+        if (!text) return;
 
         urlDirty = false;
         urlInput.blur();   // otherwise setAddressBar keeps deferring to the user
         await ensureServiceWorker();
 
-        // A fresh navigation truncates anything ahead, like a real browser.
-        entries = entries.slice(0, index + 1);
-        entries.push(url);
-        index = entries.length - 1;
+        if (!looksLikeUrl(text)) {
+            pushEntry(searchEntry(text));
+            loadEntry(entries[index]);
+            return;
+        }
 
-        loadEntry(url);
+        let url = text;
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        url = unwrap(url);
+
+        let path;
+        try {
+            path = toProxyPath(url);
+        } catch (err) {
+            showMessage('❌', 'Not a valid URL');
+            return;
+        }
+
+        pushEntry({ path: path, display: url });
+        loadEntry(entries[index]);
     }
 
     function goBack() {
@@ -484,33 +500,52 @@
         loadEntry(entries[index]);
     }
 
-    // Records navigations that originate inside the frame (link clicks, form
-    // submits, SPA routing) so Back reaches them, and keeps the URL bar honest.
-    //
-    // Some sites assign to location directly (e.g. `location.href = '/'`).
-    // `location` is unforgeable, so no in-page shim can catch that; the frame
-    // lands on this origin instead and would render our 404. Detect that here
-    // and pull it back onto the site it was really trying to reach.
-    function syncAddressBar() {
-        if (!frame) return;
+    // Describes wherever the frame currently is, or null if it has escaped.
+    function frameLocation() {
+        if (!frame) return null;
 
         let inner;
         try {
             inner = frame.contentWindow.location;
         } catch (err) {
-            return; /* frame not readable yet */
+            return undefined; /* not readable yet */
         }
 
-        if (!inner.pathname.startsWith(PROXY_PREFIX)) {
+        const path = inner.pathname + inner.search;
+
+        if (inner.pathname.startsWith(PROXY_PREFIX)) {
+            const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
+            return real ? { path: path, display: real, inner: inner } : undefined;
+        }
+
+        if (inner.pathname === SEARCH_PATH) {
+            const q = new URLSearchParams(inner.search).get('q') || '';
+            return { path: path, display: q, inner: inner };
+        }
+
+        return { escaped: true, inner: inner };
+    }
+
+    // Records navigations that originate inside the frame (link clicks, form
+    // submits, SPA routing) so Back reaches them, and keeps the URL bar honest.
+    //
+    // Some sites assign to location directly (e.g. location.href = '/').
+    // location is unforgeable, so no in-page shim can catch that; the frame
+    // lands on this origin instead and would render our 404. Detect that here
+    // and pull it back onto the site it was really trying to reach.
+    function syncAddressBar() {
+        const here = frameLocation();
+        if (here === null || here === undefined) return;
+
+        if (here.escaped) {
+            const inner = here.inner;
             const now = Date.now();
             if (!currentOrigin || inner.origin !== location.origin) return;
             if (now - lastRecovery <= 1500) return;
 
-            // A site that escapes on every load would otherwise be recovered
-            // forever, which the user sees as a page reloading every ~2s. The
-            // window is the only thing that clears this: resetting it whenever
-            // the frame is back in proxy space meant every escape/recover cycle
-            // wiped the counter and the cap never fired.
+            // The window is the only thing that clears this: resetting it
+            // whenever the frame is back in proxy space meant every
+            // escape/recover cycle wiped the counter and the cap never fired.
             recoveryTimes = recoveryTimes.filter(t => now - t < 20000);
             const escaped = inner.pathname + inner.search;
             console.warn('[proxy] frame escaped to', escaped);
@@ -528,20 +563,17 @@
             return;
         }
 
-        const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
-        if (!real) return;
-
-        setAddressBar(real);
-        try { currentOrigin = new URL(real).origin; } catch (err) { /* keep previous */ }
+        setAddressBar(here.display);
+        if (/^https?:\/\//i.test(here.display)) {
+            try { currentOrigin = new URL(here.display).origin; } catch (err) { /* keep previous */ }
+        }
 
         // While our own navigation is in flight the frame may still be showing
         // the previous page; recording it would corrupt the stack.
         if (pendingNav) return;
 
-        if (entries[index] !== real) {
-            entries = entries.slice(0, index + 1);
-            entries.push(real);
-            index = entries.length - 1;
+        if (!entries[index] || entries[index].path !== here.path) {
+            pushEntry({ path: here.path, display: here.display });
             updateNavButtons();
         }
     }
@@ -555,7 +587,7 @@
             proxyUrl(urlInput.value);
         } else if (e.key === 'Escape') {
             urlDirty = false;
-            if (index >= 0) urlInput.value = entries[index];
+            if (index >= 0) urlInput.value = entries[index].display;
             urlInput.blur();
         }
     });

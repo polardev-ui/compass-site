@@ -5,6 +5,7 @@ const path = require('path');
 const url = require('url');
 const scramjet = require('./scramjet');
 const webproxy = require('./webproxy');
+const search = require('./search');
 
 function loadEnv() {
   if (typeof process !== 'undefined' && process.env && Object.keys(process.env).length > 0) {
@@ -76,6 +77,14 @@ function handleAPIRequest(req, res) {
 
   if (pathname.startsWith(webproxy.PREFIX)) {
     webproxy.handleProxy(req, res, req.url);
+    return true;
+  }
+
+  // Search engines block this host's datacenter IP, so their result pages
+  // cannot be proxied. Query the Brave API instead and render the results with
+  // every link pointing back through the proxy.
+  if (pathname === '/api/search') {
+    search.handle(req, res, urlObj, env.BRAVE_API_KEY);
     return true;
   }
 
