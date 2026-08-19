@@ -28,12 +28,9 @@
       "handle": "filesystem"
     },
     {
-      "src": "/school/(.*)",
-      "dest": "/school/404.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/404.html"
+      "dest": "/404",
+      "status": 404
     }
   ]
 }
