@@ -51,6 +51,13 @@
         background: white;
         color: black;
     }
+
+    .footer {
+        position: absolute;
+        bottom: 10px;
+        font-size: 0.9em;
+        color: #555;
+    }
     </style>
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
@@ -64,8 +71,27 @@
 
     <button class="back-btn">go back</button>
 
+    <!--- yes this is legit js for show, thought it looked cool... don't judge me man --->
+    <p class="footer">404 Page Not Found - <span id="request-id"></span></p>
+
     <script>
     const backButton = document.querySelector('.back-btn');
+    const requestIdEl = document.querySelector('#request-id');
+
+    // a-z 0-9 random string generator for request id, does jackshit
+    function generateRequestId(length = 16) {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let id = '';
+
+        for (let i = 0; i < length; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        return id;
+    }
+
+    requestIdEl.textContent = generateRequestId(16);
+
     backButton.addEventListener('click', () => {
         if (window.history.length > 1) {
             window.history.back();
