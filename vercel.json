@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "builds": [
     {
       "src": "api/server.js",
@@ -28,8 +27,236 @@
       "handle": "filesystem"
     },
     {
+      "src": "/404",
+      "dest": "/404.html"
+    },
+    {
+      "src": "/beta",
+      "dest": "/beta/index.html"
+    },
+    {
+      "src": "/beta/",
+      "dest": "/beta/index.html"
+    },
+    {
+      "src": "/beta/ip",
+      "dest": "/beta/ip/index.html"
+    },
+    {
+      "src": "/beta/ip/",
+      "dest": "/beta/ip/index.html"
+    },
+    {
+      "src": "/beta/pages/about",
+      "dest": "/beta/pages/about/index.html"
+    },
+    {
+      "src": "/beta/pages/about/",
+      "dest": "/beta/pages/about/index.html"
+    },
+    {
+      "src": "/beta/pages/ai",
+      "dest": "/beta/pages/ai/index.html"
+    },
+    {
+      "src": "/beta/pages/ai/",
+      "dest": "/beta/pages/ai/index.html"
+    },
+    {
+      "src": "/beta/pages/credits",
+      "dest": "/beta/pages/credits/index.html"
+    },
+    {
+      "src": "/beta/pages/credits/",
+      "dest": "/beta/pages/credits/index.html"
+    },
+    {
+      "src": "/beta/pages/movies",
+      "dest": "/beta/pages/movies/index.html"
+    },
+    {
+      "src": "/beta/pages/movies/",
+      "dest": "/beta/pages/movies/index.html"
+    },
+    {
+      "src": "/beta/pages/music",
+      "dest": "/beta/pages/music/index.html"
+    },
+    {
+      "src": "/beta/pages/music/",
+      "dest": "/beta/pages/music/index.html"
+    },
+    {
+      "src": "/beta/pages/proxy",
+      "dest": "/beta/pages/proxy/index.html"
+    },
+    {
+      "src": "/beta/pages/proxy/",
+      "dest": "/beta/pages/proxy/index.html"
+    },
+    {
+      "src": "/beta/pages/socials",
+      "dest": "/beta/pages/socials/index.html"
+    },
+    {
+      "src": "/beta/pages/socials/",
+      "dest": "/beta/pages/socials/index.html"
+    },
+    {
+      "src": "/beta/pages/tv",
+      "dest": "/beta/pages/tv/index.html"
+    },
+    {
+      "src": "/beta/pages/tv/",
+      "dest": "/beta/pages/tv/index.html"
+    },
+    {
+      "src": "/ip",
+      "dest": "/ip/index.html"
+    },
+    {
+      "src": "/ip/",
+      "dest": "/ip/index.html"
+    },
+    {
+      "src": "/pages/about",
+      "dest": "/pages/about/index.html"
+    },
+    {
+      "src": "/pages/about/",
+      "dest": "/pages/about/index.html"
+    },
+    {
+      "src": "/pages/ai",
+      "dest": "/pages/ai/index.html"
+    },
+    {
+      "src": "/pages/ai/",
+      "dest": "/pages/ai/index.html"
+    },
+    {
+      "src": "/pages/credits",
+      "dest": "/pages/credits/index.html"
+    },
+    {
+      "src": "/pages/credits/",
+      "dest": "/pages/credits/index.html"
+    },
+    {
+      "src": "/pages/movies",
+      "dest": "/pages/movies/index.html"
+    },
+    {
+      "src": "/pages/movies/",
+      "dest": "/pages/movies/index.html"
+    },
+    {
+      "src": "/pages/proxy/checks",
+      "dest": "/pages/proxy/checks.html"
+    },
+    {
+      "src": "/pages/proxy",
+      "dest": "/pages/proxy/index.html"
+    },
+    {
+      "src": "/pages/proxy/",
+      "dest": "/pages/proxy/index.html"
+    },
+    {
+      "src": "/pages/roblox",
+      "dest": "/pages/roblox/index.html"
+    },
+    {
+      "src": "/pages/roblox/",
+      "dest": "/pages/roblox/index.html"
+    },
+    {
+      "src": "/pages/socials",
+      "dest": "/pages/socials/index.html"
+    },
+    {
+      "src": "/pages/socials/",
+      "dest": "/pages/socials/index.html"
+    },
+    {
+      "src": "/school/404",
+      "dest": "/school/404.html"
+    },
+    {
+      "src": "/school",
+      "dest": "/school/index.html"
+    },
+    {
+      "src": "/school/",
+      "dest": "/school/index.html"
+    },
+    {
+      "src": "/school/pages/about",
+      "dest": "/school/pages/about/index.html"
+    },
+    {
+      "src": "/school/pages/about/",
+      "dest": "/school/pages/about/index.html"
+    },
+    {
+      "src": "/school/pages/ai",
+      "dest": "/school/pages/ai/index.html"
+    },
+    {
+      "src": "/school/pages/ai/",
+      "dest": "/school/pages/ai/index.html"
+    },
+    {
+      "src": "/school/pages/credits",
+      "dest": "/school/pages/credits/index.html"
+    },
+    {
+      "src": "/school/pages/credits/",
+      "dest": "/school/pages/credits/index.html"
+    },
+    {
+      "src": "/school/pages/movies",
+      "dest": "/school/pages/movies/index.html"
+    },
+    {
+      "src": "/school/pages/movies/",
+      "dest": "/school/pages/movies/index.html"
+    },
+    {
+      "src": "/school/pages/music",
+      "dest": "/school/pages/music/index.html"
+    },
+    {
+      "src": "/school/pages/music/",
+      "dest": "/school/pages/music/index.html"
+    },
+    {
+      "src": "/school/pages/proxy",
+      "dest": "/school/pages/proxy/index.html"
+    },
+    {
+      "src": "/school/pages/proxy/",
+      "dest": "/school/pages/proxy/index.html"
+    },
+    {
+      "src": "/school/pages/socials",
+      "dest": "/school/pages/socials/index.html"
+    },
+    {
+      "src": "/school/pages/socials/",
+      "dest": "/school/pages/socials/index.html"
+    },
+    {
+      "src": "/school/pages/tv",
+      "dest": "/school/pages/tv/index.html"
+    },
+    {
+      "src": "/school/pages/tv/",
+      "dest": "/school/pages/tv/index.html"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/404",
+      "dest": "/404.html",
       "status": 404
     }
   ]
