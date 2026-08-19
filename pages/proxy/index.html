@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -250,6 +251,8 @@
     </div>
 
     <script>
+    const PROXY_PREFIX = '/api/p/';
+
     const urlInput = document.getElementById('urlInput');
     const goBtn = document.getElementById('goBtn');
     const navBackBtn = document.getElementById('backBtn');
@@ -259,63 +262,161 @@
 
     let urlHistory = [];
     let currentHistoryIndex = -1;
+    let frame = null;
 
-    async function proxyUrl(url) {
+    function encodeOrigin(origin) {
+        return btoa(origin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function decodeOrigin(segment) {
+        return atob(segment.replace(/-/g, '+').replace(/_/g, '/'));
+    }
+
+    function toProxyPath(absoluteUrl) {
+        const u = new URL(absoluteUrl);
+        return PROXY_PREFIX + encodeOrigin(u.origin) + u.pathname + u.search + u.hash;
+    }
+
+    function fromProxyPath(pathWithQuery) {
+        if (!pathWithQuery.startsWith(PROXY_PREFIX)) return null;
+        const rest = pathWithQuery.slice(PROXY_PREFIX.length);
+        const slash = rest.indexOf('/');
+        const segment = slash === -1 ? rest : rest.slice(0, slash);
+        const tail = slash === -1 ? '/' : rest.slice(slash);
+        try {
+            return decodeOrigin(segment) + tail;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    // The service worker is scoped to /api/p/ so it only intercepts requests
+    // made by proxied pages, never the rest of the site. Without it, a proxied
+    // page's root-relative and cross-origin subresources would go straight to
+    // this origin (404) or to the real host (CORS-blocked).
+    let workerReady = null;
+
+    function ensureServiceWorker() {
+        if (workerReady) return workerReady;
+
+        if (!('serviceWorker' in navigator)) {
+            workerReady = Promise.resolve(false);
+            return workerReady;
+        }
+
+        workerReady = navigator.serviceWorker
+            .register(PROXY_PREFIX + 'sw.js', { scope: PROXY_PREFIX })
+            .then(registration => new Promise(resolve => {
+                if (registration.active) return resolve(true);
+                const worker = registration.installing || registration.waiting;
+                if (!worker) return resolve(false);
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'activated') resolve(true);
+                });
+            }))
+            .catch(() => false);
+
+        return workerReady;
+    }
+
+    function showMessage(icon, text) {
+        proxyContent.innerHTML = `
+            <div class="proxy-empty">
+                <div class="proxy-empty-icon">${icon}</div>
+                <div class="proxy-empty-text">${text}</div>
+            </div>
+        `;
+        frame = null;
+    }
+
+    // The proxied document is same-origin, so its address can be read back and
+    // mirrored into the URL bar as the user clicks around inside the frame.
+    //
+    // Some sites assign to location directly (e.g. `location.href = '/'`).
+    // `location` is unforgeable, so no in-page shim can catch that; the frame
+    // lands on this origin instead and would render our 404. Detect that here
+    // and pull it back onto the site it was really trying to reach.
+    let currentOrigin = null;
+    let lastRecovery = 0;
+
+    function syncAddressBar() {
+        if (!frame) return;
+
+        let inner;
+        try {
+            inner = frame.contentWindow.location;
+        } catch (err) {
+            return; /* frame not readable yet */
+        }
+
+        if (!inner.pathname.startsWith(PROXY_PREFIX)) {
+            const now = Date.now();
+            if (currentOrigin && inner.origin === location.origin && now - lastRecovery > 1500) {
+                lastRecovery = now;
+                frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
+            }
+            return;
+        }
+
+        const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
+        if (real) {
+            urlInput.value = real;
+            try { currentOrigin = new URL(real).origin; } catch (err) { /* keep previous */ }
+        }
+    }
+
+    async function proxyUrl(url, { record = true } = {}) {
         if (!url.match(/^https?:\/\//i)) {
             url = 'https://' + url;
         }
 
-        urlInput.value = url;
+        let proxyPath;
+        try {
+            proxyPath = toProxyPath(url);
+        } catch (err) {
+            showMessage('❌', 'Not a valid URL');
+            return;
+        }
 
+        urlInput.value = url;
+        try { currentOrigin = new URL(url).origin; } catch (err) { /* validated below */ }
+
+        proxyContent.innerHTML = '';
         const loadingOverlay = document.createElement('div');
         loadingOverlay.className = 'loading-overlay';
         loadingOverlay.innerHTML = '<div class="loading-spinner">⟳</div>';
+
+        await ensureServiceWorker();
+
+        frame = document.createElement('iframe');
+        frame.className = 'proxy-frame';
+        frame.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+        frame.addEventListener('load', () => {
+            if (loadingOverlay.parentNode) loadingOverlay.remove();
+            syncAddressBar();
+        });
+
         proxyContent.style.position = 'relative';
+        proxyContent.appendChild(frame);
         proxyContent.appendChild(loadingOverlay);
 
-        try {
-            const response = await fetch('/api/proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
-            });
+        frame.src = proxyPath;
 
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            const data = await response.json();
-            proxyContent.innerHTML = '';
-
-            if (data.type === 'html') {
-                const iframe = document.createElement('iframe');
-                iframe.className = 'proxy-frame';
-                iframe.style.cssText = 'width: 100%; height: 100%; display: block;';
-                iframe.srcdoc = data.content;
-                proxyContent.appendChild(iframe);
-            } else if (data.type === 'text') {
-                const pre = document.createElement('pre');
-                pre.style.cssText = 'padding: 20px; white-space: pre-wrap; word-wrap: break-word; color: #000; background: #fff; height: 100%; overflow: auto; margin: 0; width: 100%; display: block;';
-                pre.textContent = data.content;
-                proxyContent.appendChild(pre);
-            }
-
+        if (record) {
+            urlHistory = urlHistory.slice(0, currentHistoryIndex + 1);
             urlHistory.push(url);
             currentHistoryIndex = urlHistory.length - 1;
-            updateNavButtons();
-
-        } catch (error) {
-            proxyContent.innerHTML = `
-                <div class="proxy-empty">
-                    <div class="proxy-empty-icon">❌</div>
-                    <div class="proxy-empty-text">Error: ${error.message}</div>
-                </div>
-            `;
         }
+        updateNavButtons();
     }
 
     function updateNavButtons() {
         navBackBtn.disabled = currentHistoryIndex <= 0;
         navForwardBtn.disabled = currentHistoryIndex >= urlHistory.length - 1;
     }
+
+    // Keep the URL bar honest while the user navigates inside the frame.
+    setInterval(syncAddressBar, 700);
 
     goBtn.addEventListener('click', () => {
         const url = urlInput.value.trim();
@@ -330,26 +431,31 @@
     });
 
     navBackBtn.addEventListener('click', () => {
+        if (frame && frame.contentWindow && frame.contentWindow.history.length > 1) {
+            frame.contentWindow.history.back();
+            return;
+        }
         if (currentHistoryIndex > 0) {
             currentHistoryIndex--;
-            urlInput.value = urlHistory[currentHistoryIndex];
-            proxyUrl(urlHistory[currentHistoryIndex]);
+            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
         }
     });
 
     navForwardBtn.addEventListener('click', () => {
         if (currentHistoryIndex < urlHistory.length - 1) {
             currentHistoryIndex++;
-            urlInput.value = urlHistory[currentHistoryIndex];
-            proxyUrl(urlHistory[currentHistoryIndex]);
+            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
         }
     });
 
     reloadBtn.addEventListener('click', () => {
         if (currentHistoryIndex >= 0) {
-            proxyUrl(urlHistory[currentHistoryIndex]);
+            proxyUrl(urlHistory[currentHistoryIndex], { record: false });
         }
     });
+
+    updateNavButtons();
+    ensureServiceWorker();
     </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const scramjet = require('./scramjet');
+const webproxy = require('./webproxy');
 
 function loadEnv() {
   if (typeof process !== 'undefined' && process.env && Object.keys(process.env).length > 0) {
@@ -65,6 +66,18 @@ function isBotUA(userAgent = '') {
 function handleAPIRequest(req, res) {
   const urlObj = new url.URL(req.url, `http://${req.headers.host}`);
   const pathname = urlObj.pathname;
+
+  // Streaming web proxy. Everything under /api/p/ is a proxied resource; the
+  // service worker below reroutes a proxied page's subresource requests here.
+  if (pathname === webproxy.PREFIX + 'sw.js') {
+    webproxy.handleServiceWorker(res);
+    return true;
+  }
+
+  if (pathname.startsWith(webproxy.PREFIX)) {
+    webproxy.handleProxy(req, res, req.url);
+    return true;
+  }
 
   if (pathname === '/api/config' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

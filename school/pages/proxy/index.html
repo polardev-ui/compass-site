@@ -267,7 +267,6 @@
     const frame   = document.getElementById('proxy-frame');
     const empty   = document.getElementById('empty-state');
     const trigger = document.getElementById('trigger-zone');
-    let currentTargetOrigin = '';
 
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement) {
@@ -297,43 +296,99 @@
       wrap.classList.remove('visible');
     }
 
-    function rewriteRootRelativeUrls(content, origin) {
-      if (!origin) return content;
+    const PROXY_PREFIX = '/api/p/';
 
-      const rewriteUrl = (url) => {
-        if (!url || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(url)) return url;
-        if (/^https?:\/\//i.test(url) || url.startsWith('//')) return url;
-        if (url.startsWith('/')) return origin + url;
-        return url;
-      };
+    function encodeOrigin(origin) {
+      return btoa(origin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
 
-      const attrPattern = /(href|src|action|poster|data|content)=(["'])([^"']+)\2/gi;
-      content = content.replace(attrPattern, (match, attr, quote, url) => `${attr}=${quote}${rewriteUrl(url)}${quote}`);
-      content = content.replace(/url\((['"]?)(\/[^)"']+)\1\)/gi, (match, quote, url) => `url(${quote}${origin}${url}${quote})`);
+    function decodeOrigin(segment) {
+      return atob(segment.replace(/-/g, '+').replace(/_/g, '/'));
+    }
 
-      if (!/<base\b/i.test(content)) {
-        const baseTag = `<base href="${origin}/">`;
-        if (/<head\b[^>]*>/i.test(content)) {
-          content = content.replace(/<head\b[^>]*>/i, match => `${match}${baseTag}`);
-        } else {
-          content = `<!DOCTYPE html><html><head>${baseTag}</head><body>${content}</body></html>`;
-        }
+    function toProxyPath(absoluteUrl) {
+      const u = new URL(absoluteUrl);
+      return PROXY_PREFIX + encodeOrigin(u.origin) + u.pathname + u.search + u.hash;
+    }
+
+    function fromProxyPath(pathWithQuery) {
+      if (!pathWithQuery.startsWith(PROXY_PREFIX)) return null;
+      const rest = pathWithQuery.slice(PROXY_PREFIX.length);
+      const slash = rest.indexOf('/');
+      const segment = slash === -1 ? rest : rest.slice(0, slash);
+      const tail = slash === -1 ? '/' : rest.slice(slash);
+      try {
+        return decodeOrigin(segment) + tail;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    // Scoped to /api/p/, so it only intercepts requests made by proxied pages.
+    // Without it a proxied page's root-relative and cross-origin subresources
+    // hit this origin (404) or the real host directly (CORS-blocked).
+    let workerReady = null;
+
+    function ensureServiceWorker() {
+      if (workerReady) return workerReady;
+
+      if (!('serviceWorker' in navigator)) {
+        workerReady = Promise.resolve(false);
+        return workerReady;
       }
 
-      return content;
+      workerReady = navigator.serviceWorker
+        .register(PROXY_PREFIX + 'sw.js', { scope: PROXY_PREFIX })
+        .then(registration => new Promise(resolve => {
+          if (registration.active) return resolve(true);
+          const worker = registration.installing || registration.waiting;
+          if (!worker) return resolve(false);
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'activated') resolve(true);
+          });
+        }))
+        .catch(() => false);
+
+      return workerReady;
     }
 
-    function renderHtml(content) {
-      frame.srcdoc = rewriteRootRelativeUrls(content, currentTargetOrigin);
-      frame.style.display = 'block';
-      empty.style.display = 'none';
+    // The proxied document is same-origin, so its address can be read back and
+    // mirrored into the URL bar as the user clicks around inside the frame.
+    //
+    // Some sites assign to location directly (e.g. `location.href = '/'`).
+    // `location` is unforgeable, so no in-page shim can catch that; the frame
+    // lands on this origin instead and would render our 404. Detect that here
+    // and pull it back onto the site it was really trying to reach.
+    let currentOrigin = null;
+    let lastRecovery = 0;
+
+    function syncAddressBar() {
+      if (frame.style.display === 'none') return;
+
+      let inner;
+      try {
+        inner = frame.contentWindow.location;
+      } catch (err) {
+        return; /* frame not readable yet */
+      }
+
+      if (!inner.pathname.startsWith(PROXY_PREFIX)) {
+        const now = Date.now();
+        if (currentOrigin && inner.origin === location.origin && now - lastRecovery > 1500) {
+          lastRecovery = now;
+          frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
+        }
+        return;
+      }
+
+      const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
+      if (real) {
+        if (document.activeElement !== input) input.value = real;
+        try { currentOrigin = new URL(real).origin; } catch (err) { /* keep previous */ }
+      }
     }
 
-    function renderText(content) {
-      frame.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff;color:#000;font-family:Arial,sans-serif;}pre{margin:0;padding:20px;white-space:pre-wrap;word-wrap:break-word;}</style></head><body><pre>${content.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))}</pre></body></html>`;
-      frame.style.display = 'block';
-      empty.style.display = 'none';
-    }
+    setInterval(syncAddressBar, 700);
 
     document.addEventListener('mousemove', (e) => {
       if (document.body.classList.contains('pointer-locked')) return;
@@ -377,8 +432,6 @@
 
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
-      currentTargetOrigin = new URL(url).origin;
-
       try {
         const parsed = new URL(url);
         const fav = parsed.origin + '/favicon.ico';
@@ -390,25 +443,12 @@
 
       empty.style.display = 'none';
       frame.style.display = 'block';
-      frame.srcdoc = '<!DOCTYPE html><html><body style="margin:0;background:#111;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div>Loading...</div></body></html>';
 
       try {
-        const response = await fetch('/api/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.type === 'html') {
-          renderHtml(data.content);
-        } else {
-          renderText(data.content || '');
-        }
+        const proxyPath = toProxyPath(url);
+        currentOrigin = new URL(url).origin;
+        await ensureServiceWorker();
+        frame.src = proxyPath;
       } catch (error) {
         empty.style.display = 'flex';
         frame.style.display = 'none';
@@ -421,6 +461,8 @@
       input.value = url;
       scheduleHide(1200);
     }
+
+    ensureServiceWorker();
 
     goBtn.addEventListener('click', () => navigate(input.value));
 
