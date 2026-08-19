@@ -267,6 +267,7 @@
     const frame   = document.getElementById('proxy-frame');
     const empty   = document.getElementById('empty-state');
     const trigger = document.getElementById('trigger-zone');
+    let currentTargetOrigin = '';
 
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement) {
@@ -296,8 +297,18 @@
       wrap.classList.remove('visible');
     }
 
+    function injectBaseHref(content, origin) {
+      if (!origin) return content;
+      const baseTag = `<base href="${origin}/">`;
+      if (/<base\b/i.test(content)) return content;
+      if (/<head\b[^>]*>/i.test(content)) {
+        return content.replace(/<head\b[^>]*>/i, match => `${match}${baseTag}`);
+      }
+      return `<!DOCTYPE html><html><head>${baseTag}</head><body>${content}</body></html>`;
+    }
+
     function renderHtml(content) {
-      frame.srcdoc = content;
+      frame.srcdoc = injectBaseHref(content, currentTargetOrigin);
       frame.style.display = 'block';
       empty.style.display = 'none';
     }
@@ -349,6 +360,8 @@
       if (!url) return;
 
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+      currentTargetOrigin = new URL(url).origin;
 
       try {
         const parsed = new URL(url);
