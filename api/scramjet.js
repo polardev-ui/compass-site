@@ -1,6 +1,12 @@
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+const zlib = require('zlib');
+const { promisify } = require('util');
+
+const gunzip = promisify(zlib.gunzip);
+const inflate = promisify(zlib.inflate);
+const brotliDecompress = promisify(zlib.brotliDecompress);
 
 class ScramjetProxy {
   constructor(options = {}) {
@@ -54,7 +60,7 @@ class ScramjetProxy {
           headers: {
             'User-Agent': this.userAgent,
             'Accept': options.accept || '*/*',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Encoding': 'identity',
             'Accept-Language': 'en-US,en;q=0.9',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
@@ -68,7 +74,7 @@ class ScramjetProxy {
         }
 
         protocol.get(reqOptions, (res) => {
-          let body = '';
+          const chunks = [];
 
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectCount < maxRedirects) {
             const redirectURL = res.headers.location.startsWith('http') 
@@ -79,21 +85,37 @@ class ScramjetProxy {
           }
 
           res.on('data', (chunk) => {
-            body += chunk.toString();
-            if (body.length > 10 * 1024 * 1024) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            const size = chunks.reduce((total, current) => total + current.length, 0);
+            if (size > 10 * 1024 * 1024) {
               res.destroy();
               reject(new Error('Response too large'));
             }
           });
 
-          res.on('end', () => {
-            const contentType = res.headers['content-type'] || 'text/plain';
-            resolve({
-              body,
-              contentType,
-              headers: res.headers,
-              statusCode: res.statusCode
-            });
+          res.on('end', async () => {
+            try {
+              let bodyBuffer = Buffer.concat(chunks);
+              const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+
+              if (encoding.includes('gzip')) {
+                bodyBuffer = await gunzip(bodyBuffer);
+              } else if (encoding.includes('br')) {
+                bodyBuffer = await brotliDecompress(bodyBuffer);
+              } else if (encoding.includes('deflate')) {
+                bodyBuffer = await inflate(bodyBuffer);
+              }
+
+              const contentType = res.headers['content-type'] || 'text/plain';
+              resolve({
+                body: bodyBuffer.toString('utf8'),
+                contentType,
+                headers: res.headers,
+                statusCode: res.statusCode
+              });
+            } catch (decodeError) {
+              reject(decodeError);
+            }
           });
         }).on('error', reject).on('timeout', () => {
           reject(new Error('Request timeout'));

@@ -258,7 +258,6 @@
   <iframe id="proxy-frame" style="display:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation"></iframe>
 
   <script>
-    const PROXY_BASE = '//proxy.wsgpolar.tech/proxy/';
     const DEFAULT_FAVICON = '/school/compass-school.gif';
 
     const wrap    = document.getElementById('urlbar-wrap');
@@ -297,6 +296,18 @@
       wrap.classList.remove('visible');
     }
 
+    function renderHtml(content) {
+      frame.srcdoc = content;
+      frame.style.display = 'block';
+      empty.style.display = 'none';
+    }
+
+    function renderText(content) {
+      frame.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff;color:#000;font-family:Arial,sans-serif;}pre{margin:0;padding:20px;white-space:pre-wrap;word-wrap:break-word;}</style></head><body><pre>${content.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))}</pre></body></html>`;
+      frame.style.display = 'block';
+      empty.style.display = 'none';
+    }
+
     document.addEventListener('mousemove', (e) => {
       if (document.body.classList.contains('pointer-locked')) return;
       if (e.clientY < 60) {
@@ -333,13 +344,11 @@
       }
     });
 
-    function navigate(raw) {
+    async function navigate(raw) {
       let url = raw.trim();
       if (!url) return;
 
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-
-      const proxyUrl = PROXY_BASE + url;
 
       try {
         const parsed = new URL(url);
@@ -352,7 +361,33 @@
 
       empty.style.display = 'none';
       frame.style.display = 'block';
-      frame.src = proxyUrl;
+      frame.srcdoc = '<!DOCTYPE html><html><body style="margin:0;background:#111;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div>Loading...</div></body></html>';
+
+      try {
+        const response = await fetch('/api/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.type === 'html') {
+          renderHtml(data.content);
+        } else {
+          renderText(data.content || '');
+        }
+      } catch (error) {
+        empty.style.display = 'flex';
+        frame.style.display = 'none';
+        empty.innerHTML = `
+          <img class="icon" src="/school/compass-school.gif" alt="" />
+          <p>Error: ${error.message}</p>
+        `;
+      }
 
       input.value = url;
       scheduleHide(1200);
@@ -365,25 +400,6 @@
       if (e.key === 'Escape') { input.blur(); hideBar(); }
     });
 
-    frame.addEventListener('load', () => {
-      try {
-        const frameSrc = frame.contentWindow?.location?.href;
-        if (frameSrc && frameSrc !== 'about:blank') {
-          const stripped = frameSrc.startsWith(PROXY_BASE)
-            ? frameSrc.slice(PROXY_BASE.length)
-            : frameSrc;
-          if (stripped && stripped !== 'about:blank') {
-            input.value = stripped;
-            try {
-              const parsed = new URL(stripped);
-              const fav = parsed.origin + '/favicon.ico';
-              favicon.src = fav;
-              favicon.onerror = () => { favicon.src = DEFAULT_FAVICON; };
-            } catch { favicon.src = DEFAULT_FAVICON; }
-          }
-        }
-      } catch {  }
-    });
   </script>
 </body>
 </html>
