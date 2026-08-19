@@ -507,11 +507,17 @@
             if (now - lastRecovery <= 1500) return;
 
             // A site that escapes on every load would otherwise be recovered
-            // forever, which the user sees as a page reloading every ~2s.
-            recoveryTimes = recoveryTimes.filter(t => now - t < 10000);
+            // forever, which the user sees as a page reloading every ~2s. The
+            // window is the only thing that clears this: resetting it whenever
+            // the frame is back in proxy space meant every escape/recover cycle
+            // wiped the counter and the cap never fired.
+            recoveryTimes = recoveryTimes.filter(t => now - t < 20000);
+            const escaped = inner.pathname + inner.search;
+            console.warn('[proxy] frame escaped to', escaped);
             if (recoveryTimes.length >= 3) {
-                showMessage('⚠️', 'This site keeps navigating out of the proxy. Stopped reloading it.');
+                showMessage('⚠️', 'This site keeps navigating out of the proxy (' + escaped + '). Stopped reloading it.');
                 recoveryTimes = [];
+                lastRecovery = now + 60000;   // stay stopped
                 return;
             }
             recoveryTimes.push(now);
@@ -521,8 +527,6 @@
             frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
             return;
         }
-
-        recoveryTimes = [];
 
         const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
         if (!real) return;

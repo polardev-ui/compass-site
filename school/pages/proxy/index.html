@@ -405,16 +405,18 @@
 
         // A site that escapes on every load would otherwise be recovered
         // forever, which the user sees as a page reloading every ~2s.
-        recoveryTimes = recoveryTimes.filter(t => now - t < 10000);
-        if (recoveryTimes.length >= 3) { recoveryTimes = []; return; }
+        recoveryTimes = recoveryTimes.filter(t => now - t < 20000);
+        if (recoveryTimes.length >= 3) {
+          recoveryTimes = [];
+          lastRecovery = now + 60000;   // stay stopped
+          return;
+        }
         recoveryTimes.push(now);
 
         lastRecovery = now;
         frame.src = PROXY_PREFIX + encodeOrigin(currentOrigin) + inner.pathname + inner.search;
         return;
       }
-
-      recoveryTimes = [];
 
       const real = fromProxyPath(inner.pathname + inner.search + inner.hash);
       if (real) {

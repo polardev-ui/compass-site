@@ -250,6 +250,34 @@ function clientShim(origin) {
     } catch (e) {}
   }
 
+  // Navigations are the escapes that hurt: they leave proxy space entirely and
+  // the page reloads as our 404. Anchor clicks and form submits are catchable
+  // here even when the URL was never written through a patched setter.
+  // (location.href assignment still is not: location is unforgeable.)
+  document.addEventListener('click', function(ev){
+    try {
+      var a = ev.target && ev.target.closest && ev.target.closest('a[href]');
+      if (!a) return;
+      var raw = a.getAttribute('href');
+      if (!raw || /^(#|javascript:|mailto:|tel:|data:|blob:)/i.test(raw)) return;
+      var fixed = toProxy(raw);
+      if (fixed !== raw && a.href !== new URL(fixed, location.href).href) {
+        a.setAttribute('href', fixed);
+      }
+    } catch (e) {}
+  }, true);
+
+  document.addEventListener('submit', function(ev){
+    try {
+      var form = ev.target;
+      if (!form || !form.getAttribute) return;
+      var action = form.getAttribute('action');
+      if (action == null || action === '') return;
+      var fixed = toProxy(action);
+      if (fixed !== action) form.setAttribute('action', fixed);
+    } catch (e) {}
+  }, true);
+
   var setAttr = Element.prototype.setAttribute;
   var URL_ATTRS = { src: 1, href: 1, action: 1, poster: 1 };
   Element.prototype.setAttribute = function(name, value){
