@@ -145,15 +145,23 @@ function clientShim(origin) {
   var PREFIX = ${JSON.stringify(PREFIX)};
   var ORIGIN = ${JSON.stringify(origin)};
   function enc(s){return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');}
+  function dec(s){return atob(s.replace(/-/g,'+').replace(/_/g,'/'));}
   function realUrl(){
     var seg = PREFIX + enc(ORIGIN);
     var path = location.pathname.indexOf(seg) === 0 ? location.pathname.slice(seg.length) : '/';
     return ORIGIN + (path || '/') + location.search + location.hash;
   }
+  function isProxyPath(pathname){
+    if (pathname.indexOf(PREFIX) !== 0) return false;
+    var segment = pathname.slice(PREFIX.length).split('/')[0];
+    try { return /^https?:\\/\\/[^/]+$/i.test(dec(segment)); } catch (e) { return false; }
+  }
   function toProxy(u){
     try {
       var abs = new URL(u, realUrl());
       if (abs.protocol !== 'http:' && abs.protocol !== 'https:') return u;
+      // Idempotent: scripts re-assign already rewritten URLs constantly.
+      if (isProxyPath(abs.pathname)) return abs.pathname + abs.search + abs.hash;
       return PREFIX + enc(abs.origin) + abs.pathname + abs.search + abs.hash;
     } catch (e) { return u; }
   }
@@ -237,6 +245,21 @@ function clientShim(origin) {
  * is unavailable (registration blocked, still activating, or unsupported).
  * The worker is what catches script-generated URLs; this catches static ones.
  */
+/**
+ * True when a path is already in proxy space. Decodes the origin segment rather
+ * than matching the prefix alone, so a target site that happens to serve its own
+ * /api/p/... path is still proxied correctly.
+ */
+function isProxyPath(pathname) {
+  if (!pathname.startsWith(PREFIX)) return false;
+  const segment = pathname.slice(PREFIX.length).split('/')[0];
+  try {
+    return /^https?:\/\/[^/]+$/i.test(decodeOrigin(segment));
+  } catch (err) {
+    return false;
+  }
+}
+
 function absoluteToProxy(rawUrl, baseUrl) {
   const trimmed = String(rawUrl).trim();
 
@@ -247,6 +270,14 @@ function absoluteToProxy(rawUrl, baseUrl) {
   try {
     const abs = new URL(trimmed, baseUrl);
     if (abs.protocol !== 'http:' && abs.protocol !== 'https:') return rawUrl;
+
+    // Rewriting must be idempotent: page scripts routinely read an already
+    // rewritten src/href back out and re-assign it, which would otherwise stack
+    // a second /api/p/<origin> prefix and 404.
+    if (isProxyPath(abs.pathname)) {
+      return abs.pathname + abs.search + abs.hash;
+    }
+
     return PREFIX + encodeOrigin(abs.origin) + abs.pathname + abs.search + abs.hash;
   } catch (err) {
     return rawUrl;
@@ -556,6 +587,7 @@ module.exports = {
   proxyPathFor,
   rewriteHtmlUrls,
   rewriteCss,
+  isProxyPath,
   absoluteToProxy,
   handleProxy,
   handleServiceWorker,

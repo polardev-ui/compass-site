@@ -306,9 +306,34 @@
       return atob(segment.replace(/-/g, '+').replace(/_/g, '/'));
     }
 
+    function isProxyPath(pathname) {
+      if (!pathname.startsWith(PROXY_PREFIX)) return false;
+      const segment = pathname.slice(PROXY_PREFIX.length).split('/')[0];
+      try {
+        return /^https?:\/\/[^/]+$/i.test(decodeOrigin(segment));
+      } catch (err) {
+        return false;
+      }
+    }
+
     function toProxyPath(absoluteUrl) {
       const u = new URL(absoluteUrl);
+      // Already in proxy space (e.g. re-submitting what the URL bar shows).
+      if (isProxyPath(u.pathname)) return u.pathname + u.search + u.hash;
       return PROXY_PREFIX + encodeOrigin(u.origin) + u.pathname + u.search + u.hash;
+    }
+
+    // Unwraps a proxy path back to the real URL, however many layers deep.
+    function unwrap(url) {
+      for (let i = 0; i < 5; i++) {
+        let u;
+        try { u = new URL(url); } catch (err) { return url; }
+        if (!isProxyPath(u.pathname)) return url;
+        const real = fromProxyPath(u.pathname + u.search + u.hash);
+        if (!real || real === url) return url;
+        url = real;
+      }
+      return url;
     }
 
     function fromProxyPath(pathWithQuery) {
@@ -431,6 +456,7 @@
       if (!url) return;
 
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      url = unwrap(url);
 
       try {
         const parsed = new URL(url);
