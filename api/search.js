@@ -59,9 +59,9 @@ function send(res, status, html) {
   res.end(html);
 }
 
-function renderResults(query, results) {
+function renderResults(query, results, providerLabel) {
   if (!results.length) {
-    return page(query + ' - search', `<div class="head">No results for &ldquo;${escapeHtml(query)}&rdquo;</div>`);
+    return page(query + ' - search', `<div class="head">No results for &ldquo;${escapeHtml(query)}&rdquo; &middot; via ${escapeHtml(providerLabel)}</div>`);
   }
 
   const items = results.map(r => {
@@ -80,34 +80,11 @@ function renderResults(query, results) {
   }).join('');
 
   return page(query + ' - search',
-    `<div class="head">${results.length} results for &ldquo;${escapeHtml(query)}&rdquo; &middot; via Brave Search</div>${items}`);
+    `<div class="head">${results.length} results for &ldquo;${escapeHtml(query)}&rdquo; &middot; via ${escapeHtml(providerLabel)}</div>${items}`);
 }
 
-function handle(req, res, urlObj, apiKey) {
-  const query = (urlObj.searchParams.get('q') || '').trim();
-
-  if (!query) {
-    return send(res, 400, notice('No query', ['Add a <code>?q=</code> parameter.']));
-  }
-
-  if (!apiKey) {
-    return send(res, 503, notice('Search is not configured', [
-      'Set <code>BRAVE_API_KEY</code> in the Vercel project environment variables, then redeploy.',
-      'Get a key at <code>api-dashboard.search.brave.com</code> — the free tier covers about 2,000 queries a month.',
-      'Search engines block this host&rsquo;s datacenter IP, so their pages cannot be scraped; the API is keyed instead of IP-judged.'
-    ]));
-  }
-
-  const request = https.get({
-    hostname: ENDPOINT,
-    path: '/res/v1/web/search?count=20&q=' + encodeURIComponent(query),
-    headers: {
-      'Accept': 'application/json',
-      'Accept-Encoding': 'gzip',
-      'X-Subscription-Token': apiKey
-    },
-    timeout: 15000
-  }, apiRes => {
+function fetchJson(options, cb) {
+  const request = https.get(options, apiRes => {
     const chunks = [];
     apiRes.on('data', chunk => chunks.push(chunk));
     apiRes.on('end', () => {
@@ -115,38 +92,132 @@ function handle(req, res, urlObj, apiKey) {
       if ((apiRes.headers['content-encoding'] || '').includes('gzip')) {
         try { raw = zlib.gunzipSync(raw); } catch (err) { /* fall through */ }
       }
-
-      if (apiRes.statusCode === 401 || apiRes.statusCode === 403) {
-        return send(res, 502, notice('Search key rejected', [
-          'Brave returned ' + apiRes.statusCode + '. Check that <code>BRAVE_API_KEY</code> is correct and the subscription is active.'
-        ]));
-      }
-      if (apiRes.statusCode === 429) {
-        return send(res, 502, notice('Search quota reached', [
-          'Brave returned 429 (rate limited). The free tier allows roughly 2,000 queries a month and one query per second.'
-        ]));
-      }
-      if (apiRes.statusCode !== 200) {
-        return send(res, 502, notice('Search failed', ['Brave returned ' + apiRes.statusCode + '.']));
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(raw.toString('utf8'));
-      } catch (err) {
-        return send(res, 502, notice('Search failed', ['Could not parse the response from Brave.']));
-      }
-
-      const results = ((parsed.web && parsed.web.results) || [])
-        .filter(r => r && r.url);
-      send(res, 200, renderResults(query, results));
+      let parsed = null;
+      try { parsed = JSON.parse(raw.toString('utf8')); } catch (err) { /* not json */ }
+      cb(null, apiRes.statusCode, parsed);
     });
   });
-
   request.on('timeout', () => request.destroy(new Error('timeout')));
-  request.on('error', err => {
-    if (!res.headersSent) send(res, 502, notice('Search failed', [escapeHtml(err.message)]));
-  });
+  request.on('error', err => cb(err));
+}
+
+// Providers are ordered by result quality. Each is skipped unless its
+// credentials are present, so the chain degrades to a keyless default.
+const PROVIDERS = {
+  brave: {
+    label: 'Brave Search',
+    available: env => !!env.BRAVE_API_KEY,
+    request: (env, query) => ({
+      hostname: 'api.search.brave.com',
+      path: '/res/v1/web/search?count=20&q=' + encodeURIComponent(query),
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': env.BRAVE_API_KEY
+      },
+      timeout: 15000
+    }),
+    parse: body => ((body.web && body.web.results) || [])
+      .map(r => ({ title: r.title, url: r.url, description: r.description }))
+  },
+
+  google: {
+    label: 'Google',
+    available: env => !!(env.GOOGLE_CSE_KEY && env.GOOGLE_CSE_ID),
+    request: (env, query) => ({
+      hostname: 'www.googleapis.com',
+      path: '/customsearch/v1?key=' + encodeURIComponent(env.GOOGLE_CSE_KEY) +
+            '&cx=' + encodeURIComponent(env.GOOGLE_CSE_ID) +
+            '&num=10&q=' + encodeURIComponent(query),
+      headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip' },
+      timeout: 15000
+    }),
+    parse: body => (body.items || [])
+      .map(r => ({ title: r.title, url: r.link, description: r.snippet }))
+  },
+
+  // Keyless fallback so search works with no signup at all. Small, old-web
+  // index, so results are thin compared with the keyed providers.
+  wiby: {
+    label: 'wiby.me',
+    available: () => true,
+    request: (env, query) => ({
+      hostname: 'wiby.me',
+      path: '/json/?q=' + encodeURIComponent(query),
+      headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip' },
+      timeout: 15000
+    }),
+    parse: body => (Array.isArray(body) ? body : [])
+      .map(r => ({ title: r.Title, url: r.URL, description: r.Snippet || r.Description }))
+  }
+};
+
+const ORDER = ['brave', 'google', 'wiby'];
+
+function handle(req, res, urlObj, env) {
+  env = env || {};
+  const query = (urlObj.searchParams.get('q') || '').trim();
+
+  if (!query) {
+    return send(res, 400, notice('No query', ['Add a <code>?q=</code> parameter.']));
+  }
+
+  const requested = urlObj.searchParams.get('engine');
+  const chain = (requested && PROVIDERS[requested] ? [requested] : ORDER)
+    .filter(name => PROVIDERS[name].available(env));
+
+  if (!chain.length) {
+    return send(res, 503, notice('Search is not configured', [
+      'No search provider is available.'
+    ]));
+  }
+
+  const problems = [];
+
+  function attempt(i) {
+    if (i >= chain.length) {
+      return send(res, 502, notice('Search failed', problems.length ? problems : ['No provider returned results.']));
+    }
+
+    const name = chain[i];
+    const provider = PROVIDERS[name];
+
+    fetchJson(provider.request(env, query), (err, status, body) => {
+      if (err) {
+        problems.push(escapeHtml(provider.label + ': ' + err.message));
+        return attempt(i + 1);
+      }
+      if (status === 401 || status === 403) {
+        problems.push(provider.label + ': key rejected (' + status + '). Check the credentials in the Vercel environment variables.');
+        return attempt(i + 1);
+      }
+      if (status === 429) {
+        problems.push(provider.label + ': rate limited or quota exhausted (429).');
+        return attempt(i + 1);
+      }
+      if (status !== 200 || !body) {
+        problems.push(provider.label + ': returned ' + status + '.');
+        return attempt(i + 1);
+      }
+
+      let results;
+      try {
+        results = provider.parse(body).filter(r => r && r.url);
+      } catch (parseErr) {
+        problems.push(provider.label + ': unexpected response shape.');
+        return attempt(i + 1);
+      }
+
+      if (!results.length && i < chain.length - 1) {
+        problems.push(provider.label + ': no results.');
+        return attempt(i + 1);
+      }
+
+      send(res, 200, renderResults(query, results, provider.label));
+    });
+  }
+
+  attempt(0);
 }
 
 module.exports = { handle };

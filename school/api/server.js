@@ -84,7 +84,7 @@ function handleAPIRequest(req, res) {
   // cannot be proxied. Query the Brave API instead and render the results with
   // every link pointing back through the proxy.
   if (pathname === '/api/search') {
-    search.handle(req, res, urlObj, env.BRAVE_API_KEY);
+    search.handle(req, res, urlObj, env);
     return true;
   }
 
